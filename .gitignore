@@ -25,6 +25,7 @@ replay_pid*
 
 # Jetbrains IDEs
 .idea/
+*.iml
 
 # Claude Code AI
 .claude/

@@ -1,0 +1,50 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: wallet-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ledger}
+    username: ${SPRING_DATASOURCE_USERNAME:ledger}
+    password: ${SPRING_DATASOURCE_PASSWORD:ledger}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  flyway:
+    locations: classpath:db/migration
+    schemas: wallet_db
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  pattern:
+    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%p","service":"wallet-service","trace_id":"%X{traceId}","span_id":"%X{spanId}","msg":"%m"}%n'
+
+ledger:
+  service:
+    url: ${LEDGER_SERVICE_URL:http://localhost:8081}
+  idempotency:
+    ttl-hours: 24
+    pending-sweep-seconds: 60
+  daily-transfer-cap: 100000.00
+
+jwt:
+  public-key-path: ${JWT_PUBLIC_KEY_PATH:keys/public.pem}
+
+otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
