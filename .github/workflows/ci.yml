@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  wallet-service:
+    name: Wallet Service (Java)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: temurin
+          cache: maven
+      - name: Build and test
+        working-directory: services/wallet-service
+        run: ./mvnw -q verify
+      - name: Check for SQL string concatenation
+        working-directory: services/wallet-service
+        run: |
+          COUNT=$(grep -rn --include="*.java" '".*\+.*"' src/main || true | grep -i 'query\|sql' | wc -l)
+          if [ "$COUNT" -gt 0 ]; then echo "Possible SQL concatenation"; exit 1; fi
+
+  ledger-service:
+    name: Ledger Service (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/ledger-service/go.sum
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/ledger-service
+      - name: Test
+        working-directory: services/ledger-service
+        run: go test ./...
+
+  projection-service:
+    name: Projection Service (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/projection-service/go.sum
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/projection-service
+      - name: Test
+        working-directory: services/projection-service
+        run: go test ./...
