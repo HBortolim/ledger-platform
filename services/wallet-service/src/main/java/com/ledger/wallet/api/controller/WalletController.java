@@ -2,16 +2,18 @@ package com.ledger.wallet.api.controller;
 
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.api.dto.CreateWalletResponse;
+import com.ledger.wallet.application.usecase.CreateWalletUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/wallets")
 public class WalletController {
+
+    private CreateWalletUseCase createWalletUseCase;
 
     public WalletController() {
 
