@@ -27,4 +27,6 @@ SIG=$(printf '%s.%s' "$HEADER" "$PAYLOAD" \
   | openssl dgst -sha256 -sign "$PRIVATE_KEY" \
   | openssl base64 -A | tr '+/' '-_' | tr -d '=')
 
-printf '%s.%s.%s\n' "$HEADER" "$PAYLOAD" "$SIG"
+JWT="$HEADER.$PAYLOAD.$SIG"
+printf '%s\n' "$JWT"       # stdout — captured by TOKEN=$(...)
+printf '%s\n' "$JWT" >&2  # stderr — always visible in terminal

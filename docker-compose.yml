@@ -52,6 +52,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ledger
       LEDGER_SERVICE_URL: http://ledger-service:8081
       JWT_PUBLIC_KEY_PATH: /keys/public.pem
+    volumes:
+      - ./keys:/keys:ro
     depends_on:
       postgres:
         condition: service_healthy
