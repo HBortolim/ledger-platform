@@ -28,6 +28,11 @@ management:
     export:
       prometheus:
         enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTLP_METRICS_ENABLED:false}
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
 
 logging:
   pattern:
