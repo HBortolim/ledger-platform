@@ -3,9 +3,16 @@ package com.ledger.wallet.api.controller;
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.api.dto.CreateWalletResponse;
 import com.ledger.wallet.application.usecase.CreateWalletUseCase;
+import com.ledger.wallet.infrastructure.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
@@ -13,36 +20,40 @@ import java.util.UUID;
 @RequestMapping("/wallets")
 public class WalletController {
 
-    private CreateWalletUseCase createWalletUseCase;
+    private final CreateWalletUseCase createWalletUseCase;
 
-    public WalletController() {
-
+    public WalletController(CreateWalletUseCase createWalletUseCase) {
+        this.createWalletUseCase = createWalletUseCase;
     }
 
     @PostMapping
-    public ResponseEntity<CreateWalletResponse> createWallet(@Valid @RequestBody CreateWalletRequest request) {
-        // TODO: implement via use case
-        throw new UnsupportedOperationException("not yet implemented");
+    public ResponseEntity<CreateWalletResponse> createWallet(
+            @Valid @RequestBody CreateWalletRequest request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        CreateWalletResponse response = createWalletUseCase.execute(request, principal);
+        return ResponseEntity.status(201)
+                .header("Location", "/wallets/" + response.walletId())
+                .body(response);
     }
 
     @GetMapping("/{walletId}/balance")
-    public ResponseEntity<?> getBalance(@PathVariable UUID walletId) {
+    public ResponseEntity<?> getBalance(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
         // TODO: implement via use case
         throw new UnsupportedOperationException("not yet implemented");
     }
 
     @PostMapping("/{walletId}/freeze")
-    public ResponseEntity<?> freeze(@PathVariable UUID walletId) {
+    public ResponseEntity<?> freeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
         throw new UnsupportedOperationException("not yet implemented");
     }
 
     @PostMapping("/{walletId}/unfreeze")
-    public ResponseEntity<?> unfreeze(@PathVariable UUID walletId) {
+    public ResponseEntity<?> unfreeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
         throw new UnsupportedOperationException("not yet implemented");
     }
 
     @PostMapping("/{walletId}/close")
-    public ResponseEntity<?> close(@PathVariable UUID walletId) {
+    public ResponseEntity<?> close(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
         throw new UnsupportedOperationException("not yet implemented");
     }
 }

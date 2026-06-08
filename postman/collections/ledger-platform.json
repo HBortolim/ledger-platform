@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "Ledger Platform",
+    "description": "Health checks and API endpoints for all ledger-platform services.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "walletServiceUrl",
+      "value": "http://localhost:8080",
+      "description": "wallet-service base URL"
+    },
+    {
+      "key": "ledgerServiceUrl",
+      "value": "http://localhost:8081",
+      "description": "ledger-service base URL"
+    },
+    {
+      "key": "projectionServiceUrl",
+      "value": "http://localhost:8082",
+      "description": "projection-service base URL"
+    }
+  ],
+  "item": [
+    {
+      "name": "wallet-service",
+      "description": "Spring Boot service — port 8080",
+      "item": [
+        {
+          "name": "Health Live",
+          "request": {
+            "method": "GET",
+            "url": "{{walletServiceUrl}}/health/live",
+            "description": "Liveness probe — returns 200 when the process is up."
+          }
+        },
+        {
+          "name": "Health Ready",
+          "request": {
+            "method": "GET",
+            "url": "{{walletServiceUrl}}/health/ready",
+            "description": "Readiness probe — returns 200 when dependencies are reachable."
+          }
+        },
+        {
+          "name": "Create Wallet",
+          "request": {
+            "method": "POST",
+            "url": "{{walletServiceUrl}}/wallets",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"ownerId\": \"{{userId}}\",\n  \"currency\": \"BRL\"\n}"
+            },
+            "description": "Create a new wallet. ownerId must match the JWT subject (AC-1.3). Only BRL is supported (AC-1.4)."
+          }
+        },
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "url": "{{walletServiceUrl}}/wallets/:walletId/balance",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "description": "Returns the projected balance for a wallet. Includes stale flag if projection lag > 5s (AC-2.4)."
+          }
+        },
+        {
+          "name": "Freeze Wallet",
+          "request": {
+            "method": "POST",
+            "url": "{{walletServiceUrl}}/wallets/:walletId/freeze",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "description": "Freeze an ACTIVE wallet. Idempotent if already FROZEN. Returns 409 if CLOSED (AC-3.1–3.3)."
+          }
+        },
+        {
+          "name": "Unfreeze Wallet",
+          "request": {
+            "method": "POST",
+            "url": "{{walletServiceUrl}}/wallets/:walletId/unfreeze",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "description": "Unfreeze a FROZEN wallet, returning it to ACTIVE."
+          }
+        },
+        {
+          "name": "Close Wallet",
+          "request": {
+            "method": "POST",
+            "url": "{{walletServiceUrl}}/wallets/:walletId/close",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "description": "Close a wallet. Returns 409 if balance is non-zero (AC-4.1). Cannot be reopened."
+          }
+        },
+        {
+          "name": "Create Transfer",
+          "request": {
+            "method": "POST",
+            "url": "{{walletServiceUrl}}/transfers",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwt}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"sourceWalletId\": \"\",\n  \"destinationWalletId\": \"\",\n  \"amount\": \"100.00\",\n  \"description\": \"\"\n}"
+            },
+            "description": "Initiate a wallet-to-wallet transfer. Idempotency-Key header recommended (AC-5.12–5.15)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "ledger-service",
+      "description": "Go/Gin service — port 8081",
+      "item": [
+        {
+          "name": "Health Live",
+          "request": {
+            "method": "GET",
+            "url": "{{ledgerServiceUrl}}/health/live",
+            "description": "Liveness probe — returns 200 when the process is up."
+          }
+        },
+        {
+          "name": "Health Ready",
+          "request": {
+            "method": "GET",
+            "url": "{{ledgerServiceUrl}}/health/ready",
+            "description": "Readiness probe — returns 200 when dependencies (DB, Kafka) are reachable."
+          }
+        },
+        {
+          "name": "Post Posting",
+          "request": {
+            "method": "POST",
+            "url": "{{ledgerServiceUrl}}/ledger/postings",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"debitWalletId\": \"\",\n  \"creditWalletId\": \"\",\n  \"amount\": 0,\n  \"currency\": \"BRL\",\n  \"idempotencyKey\": \"\"\n}"
+            },
+            "description": "Submit a double-entry posting between two wallets."
+          }
+        },
+        {
+          "name": "Get Transaction",
+          "request": {
+            "method": "GET",
+            "url": "{{ledgerServiceUrl}}/admin/ledger/transactions/:id",
+            "description": "Admin — fetch a transaction by ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "projection-service",
+      "description": "Go/Gin service — port 8082",
+      "item": [
+        {
+          "name": "Health Live",
+          "request": {
+            "method": "GET",
+            "url": "{{projectionServiceUrl}}/health/live",
+            "description": "Liveness probe — returns 200 when the process is up."
+          }
+        },
+        {
+          "name": "Health Ready",
+          "request": {
+            "method": "GET",
+            "url": "{{projectionServiceUrl}}/health/ready",
+            "description": "Readiness probe — returns 200 when dependencies (DB, Kafka) are reachable."
+          }
+        },
+        {
+          "name": "Rebuild Projection",
+          "request": {
+            "method": "POST",
+            "url": "{{projectionServiceUrl}}/admin/projections/:walletId/rebuild",
+            "description": "Admin — rebuild the balance projection for a wallet from the ledger event log."
+          }
+        }
+      ]
+    }
+  ]
+}
