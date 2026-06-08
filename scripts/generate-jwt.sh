@@ -17,7 +17,7 @@ if [ ! -f "$PRIVATE_KEY" ]; then
   echo "Keys written to keys/private.pem and keys/public.pem"
 fi
 
-HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+HEADER=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
 NOW=$(date +%s)
 EXP=$((NOW + 86400))
 PAYLOAD=$(printf '{"sub":"%s","role":"%s","iat":%d,"exp":%d}' "$USER_ID" "$ROLE" "$NOW" "$EXP" \
