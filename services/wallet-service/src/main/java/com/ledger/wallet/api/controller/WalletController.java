@@ -2,9 +2,12 @@ package com.ledger.wallet.api.controller;
 
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.api.dto.CreateWalletResponse;
+import com.ledger.wallet.api.dto.GetWalletResponse;
 import com.ledger.wallet.application.usecase.CreateWalletUseCase;
+import com.ledger.wallet.application.usecase.GetWalletUseCase;
 import com.ledger.wallet.infrastructure.security.AuthenticatedUser;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +24,11 @@ import java.util.UUID;
 public class WalletController {
 
     private final CreateWalletUseCase createWalletUseCase;
+    private final GetWalletUseCase getWalletUseCase;
 
-    public WalletController(CreateWalletUseCase createWalletUseCase) {
+    public WalletController(CreateWalletUseCase createWalletUseCase, GetWalletUseCase getWalletUseCase) {
         this.createWalletUseCase = createWalletUseCase;
+        this.getWalletUseCase = getWalletUseCase;
     }
 
     @PostMapping
@@ -34,6 +39,14 @@ public class WalletController {
         return ResponseEntity.status(201)
                 .header("Location", "/wallets/" + response.walletId())
                 .body(response);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<GetWalletResponse> getWallet(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser principal) {
+        final var response = getWalletUseCase.execute(id, principal);
+        return response.map(getWalletResponse ->
+                ResponseEntity.status(HttpStatus.OK).body(getWalletResponse))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{walletId}/balance")
