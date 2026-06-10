@@ -7,7 +7,6 @@ import com.ledger.wallet.domain.model.Wallet;
 import com.ledger.wallet.infrastructure.security.AuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +23,9 @@ public class CreateWalletUseCase {
 
     @Transactional
     public CreateWalletResponse execute(CreateWalletRequest request, AuthenticatedUser principal) {
-        LOGGER.info("Create Wallet Request for user: {}", principal.userId());
+        LOGGER.debug("Create Wallet Request for user: {}", principal.userId());
 
-        if (!request.ownerId().equals(principal.userId())) {
-            throw new AccessDeniedException("Cannot create wallet for another user");
-        }
-
-        Wallet wallet = Wallet.create(request.ownerId(), request.currency())
+        Wallet wallet = Wallet.create(principal.userId(), request.currency())
                 .orElseThrow(DomainValidationException::new);
 
         repository.save(wallet);
