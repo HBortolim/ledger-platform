@@ -18,12 +18,15 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     @Bean
+    @ConditionalOnMissingBean(RSAPublicKey.class)
     public RSAPublicKey jwtPublicKey(JwtProperties props) throws Exception {
         Path keyPath = Path.of(props.publicKeyPath()).toAbsolutePath();
         try {
