@@ -54,9 +54,20 @@
             "body": {
               "mode": "raw",
               "options": { "raw": { "language": "json" } },
-              "raw": "{\n  \"ownerId\": \"{{userId}}\",\n  \"currency\": \"BRL\"\n}"
+              "raw": "{\n  \"currency\": \"BRL\"\n}"
             },
-            "description": "Create a new wallet. ownerId must match the JWT subject (AC-1.3). Only BRL is supported (AC-1.4)."
+            "description": "Create a new wallet. ownerId is derived from the JWT subject. Only BRL is supported (AC-1.4)."
+          }
+        },
+        {
+          "name": "Get Wallet",
+          "request": {
+            "method": "GET",
+            "url": "{{walletServiceUrl}}/wallets/:id",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt}}" }
+            ],
+            "description": "Retrieve a wallet by ID. Returns 404 if not found or not owned by the caller (IDOR prevention)."
           }
         },
         {
