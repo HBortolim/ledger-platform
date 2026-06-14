@@ -5,7 +5,6 @@ import java.util.UUID;
 
 public record CreateWalletResponse(
         UUID walletId,
-        UUID ownerId,
         String currency,
         String status,
         Instant createdAt

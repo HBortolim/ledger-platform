@@ -14,6 +14,7 @@ spring:
   flyway:
     locations: classpath:db/migration
     schemas: wallet_db
+    baseline-on-migrate: true
 
 management:
   endpoints:

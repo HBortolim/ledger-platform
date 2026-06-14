@@ -34,7 +34,6 @@ public class CreateWalletUseCase {
 
         return new CreateWalletResponse(
                 wallet.id(),
-                wallet.ownerId(),
                 wallet.currency(),
                 wallet.status().name(),
                 wallet.createdAt()
