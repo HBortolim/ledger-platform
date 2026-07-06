@@ -33,3 +33,6 @@ replay_pid*
 
 # JWT private key — never commit
 keys/private.pem
+
+# MacOS
+.DS_Store
