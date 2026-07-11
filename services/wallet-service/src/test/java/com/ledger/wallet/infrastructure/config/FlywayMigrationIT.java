@@ -9,7 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Regression test for FlywayConfig actually running at app startup (no autoconfig backs it in this Boot version).
+// Regression test for spring-boot-starter-flyway actually migrating wallet_db at app startup.
 class FlywayMigrationIT extends BaseIntegrationTest {
 
     @Autowired

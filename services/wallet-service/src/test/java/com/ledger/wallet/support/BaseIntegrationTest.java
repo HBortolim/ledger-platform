@@ -24,7 +24,7 @@ public abstract class BaseIntegrationTest {
         postgres.start();
     }
 
-    // Schema is created by the app's own FlywayConfig bean at Spring startup, not here.
+    // Schema is created by Spring Boot's own Flyway autoconfiguration at startup, not here.
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
