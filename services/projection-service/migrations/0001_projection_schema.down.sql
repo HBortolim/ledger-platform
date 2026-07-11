@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS projection_db CASCADE;

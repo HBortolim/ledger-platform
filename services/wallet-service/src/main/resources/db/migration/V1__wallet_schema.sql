@@ -1,5 +1,3 @@
--- wallet_db schema
-
 CREATE SCHEMA IF NOT EXISTS wallet_db;
 
 CREATE TABLE wallet_db.wallets (

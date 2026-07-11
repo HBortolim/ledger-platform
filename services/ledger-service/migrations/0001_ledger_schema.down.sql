@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS ledger_db CASCADE;

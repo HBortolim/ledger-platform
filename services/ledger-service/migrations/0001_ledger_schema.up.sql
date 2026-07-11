@@ -58,6 +58,3 @@ CREATE TABLE ledger_db.outbox (
     published_at TIMESTAMPTZ
 );
 CREATE INDEX idx_outbox_unpublished ON ledger_db.outbox(id) WHERE published_at IS NULL;
-
--- Restrict app user: no UPDATE/DELETE on ledger tables
--- (Run after creating the app role, e.g. in V5__grants.sql)

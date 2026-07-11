@@ -11,12 +11,35 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/postgres/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ledger"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  ledger-migrate:
+    image: migrate/migrate:v4.17.1
+    volumes:
+      - ./services/ledger-service/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable&x-migrations-table=ledger_schema_migrations"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  projection-migrate:
+    image: migrate/migrate:v4.17.1
+    volumes:
+      - ./services/projection-service/migrations:/migrations:ro
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable&x-migrations-table=projection_schema_migrations"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -77,6 +100,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      ledger-migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health/live"]
       interval: 10s
@@ -96,6 +121,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      projection-migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
