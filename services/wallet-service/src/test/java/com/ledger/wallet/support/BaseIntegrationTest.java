@@ -1,8 +1,6 @@
 package com.ledger.wallet.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -12,28 +10,21 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @Import(TestSecurityConfig.class)
-@Testcontainers
 @Transactional
 public abstract class BaseIntegrationTest {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
+    // Singleton container pattern: started once per JVM, never stopped, so it outlives any single IT class.
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 
-    @BeforeAll
-    static void applyMigrations() {
-        Flyway.configure()
-                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
-                .schemas("wallet_db")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+    static {
+        postgres.start();
     }
+
+    // Schema is created by the app's own FlywayConfig bean at Spring startup, not here.
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
