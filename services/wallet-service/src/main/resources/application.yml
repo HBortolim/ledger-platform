@@ -6,12 +6,16 @@ spring:
     name: wallet-service
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ledger}
-    username: ${SPRING_DATASOURCE_USERNAME:ledger}
-    password: ${SPRING_DATASOURCE_PASSWORD:ledger}
+    username: ${SPRING_DATASOURCE_USERNAME:wallet_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:wallet_app}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
+      initialization-fail-timeout: -1
   flyway:
+    url: ${FLYWAY_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ledger}
+    user: ${FLYWAY_DATASOURCE_USERNAME:ledger}
+    password: ${FLYWAY_DATASOURCE_PASSWORD:ledger}
     locations: classpath:db/migration
     schemas: wallet_db
     baseline-on-migrate: true

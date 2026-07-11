@@ -71,8 +71,11 @@ services:
       - "8080:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ledger
-      SPRING_DATASOURCE_USERNAME: ledger
-      SPRING_DATASOURCE_PASSWORD: ledger
+      SPRING_DATASOURCE_USERNAME: wallet_app
+      SPRING_DATASOURCE_PASSWORD: wallet_app
+      FLYWAY_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ledger
+      FLYWAY_DATASOURCE_USERNAME: ledger
+      FLYWAY_DATASOURCE_PASSWORD: ledger
       LEDGER_SERVICE_URL: http://ledger-service:8081
       JWT_PUBLIC_KEY_PATH: /keys/public.pem
     volumes:
@@ -113,7 +116,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      DATABASE_URL: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+      DATABASE_URL: postgres://projection_app:projection_app@postgres:5432/ledger?sslmode=disable
       KAFKA_BROKERS: kafka:29092
       KAFKA_GROUP_ID: projection-service
     depends_on:

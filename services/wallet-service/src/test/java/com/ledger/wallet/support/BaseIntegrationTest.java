@@ -26,11 +26,17 @@ public abstract class BaseIntegrationTest {
 
     // Schema is created by Spring Boot's own Flyway autoconfiguration at startup, not here.
 
+    // Flyway migrates as the container's owner user (it creates the wallet_app role itself);
+    // the app's own datasource connects as wallet_app, mirroring the production credential split.
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("spring.flyway.url", postgres::getJdbcUrl);
+        registry.add("spring.flyway.user", postgres::getUsername);
+        registry.add("spring.flyway.password", postgres::getPassword);
+
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.username", () -> "wallet_app");
+        registry.add("spring.datasource.password", () -> "wallet_app");
     }
 
     @Autowired

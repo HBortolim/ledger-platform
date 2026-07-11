@@ -74,6 +74,26 @@ func TestProjectionMigrationsApplyCleanly(t *testing.T) {
 		}
 	}
 
+	var roleExists int
+	err = conn.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname = 'projection_app'").Scan(&roleExists)
+	if err != nil || roleExists != 1 {
+		t.Errorf("expected projection_app role to exist, err=%v found=%d", err, roleExists)
+	}
+
+	appDSN := fmt.Sprintf("postgres://projection_app:projection_app@localhost:%s/ledger?sslmode=disable", hostPort)
+	appConn, err := pgx.Connect(ctx, appDSN)
+	if err != nil {
+		t.Fatalf("could not connect as projection_app: %v", err)
+	}
+	defer appConn.Close(ctx)
+
+	if _, err := appConn.Exec(ctx, "DELETE FROM projection_db.wallet_balances"); err != nil {
+		t.Errorf("expected projection_app to retain DELETE on wallet_balances (rebuild flow), got: %v", err)
+	}
+	if _, err := appConn.Exec(ctx, "DELETE FROM projection_db.projection_offsets"); err == nil {
+		t.Error("expected projection_app to be denied DELETE on projection_offsets, but it succeeded")
+	}
+
 	// Re-running against an already-migrated database must be a clean no-op, not an error —
 	// this is the exact regression ADR-004 exists to prevent.
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
