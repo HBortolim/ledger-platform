@@ -22,7 +22,7 @@ type postingEntryRequest struct {
 
 type postingRequest struct {
 	TransactionID uuid.UUID             `json:"transactionId" binding:"required"`
-	Type          string                `json:"type" binding:"required"`
+	Type          string                `json:"type" binding:"required,oneof=TRANSFER DEPOSIT WITHDRAWAL REVERSAL"`
 	Description   string                `json:"description"`
 	Entries       []postingEntryRequest `json:"entries" binding:"required,min=2"`
 }

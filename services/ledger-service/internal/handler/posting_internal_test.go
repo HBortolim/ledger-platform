@@ -272,6 +272,26 @@ func TestPostPosting_FewerThanTwoEntries_Returns422ValidationError(t *testing.T)
 	assertErrorCode(t, w, http.StatusUnprocessableEntity, "VALIDATION_ERROR")
 }
 
+func TestPostPosting_InvalidType_Returns422ValidationError(t *testing.T) {
+	svc := &fakePostingService{}
+	r := newTestRouter(svc)
+
+	body, _ := json.Marshal(map[string]any{
+		"transactionId": uuid.New(),
+		"type":          "GARBAGE",
+		"entries": []map[string]any{
+			{"accountId": uuid.New(), "entryType": "DEBIT", "amount": "100.00"},
+			{"accountId": uuid.New(), "entryType": "CREDIT", "amount": "100.00"},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/ledger/postings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assertErrorCode(t, w, http.StatusUnprocessableEntity, "VALIDATION_ERROR")
+}
+
 func TestGetTransaction_Found_Returns200(t *testing.T) {
 	id := uuid.New()
 	want := domain.LedgerTransaction{
