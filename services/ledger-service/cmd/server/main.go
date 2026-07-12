@@ -13,6 +13,8 @@ import (
 	"github.com/ledger-platform/ledger-service/internal/config"
 	"github.com/ledger-platform/ledger-service/internal/handler"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
+	"github.com/ledger-platform/ledger-service/internal/repository"
+	"github.com/ledger-platform/ledger-service/internal/service"
 )
 
 func main() {
@@ -30,10 +32,14 @@ func main() {
 	}
 	defer pool.Close()
 
+	postingRepo := repository.NewPostingRepository(pool)
+	postingSvc := service.NewPostingService(postingRepo)
+	postingHandler := handler.NewPostingHandler(postingSvc)
+
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	handler.RegisterRoutes(router, pool)
+	handler.RegisterRoutes(router, pool, postingHandler)
 
 	go registerWorkers(ctx)
 
