@@ -55,7 +55,7 @@ func setupLedgerDB(t *testing.T) (ownerDSN, appDSN string) {
 		if err != nil {
 			return err
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 		return conn.Ping(ctx)
 	}); err != nil {
 		t.Fatalf("postgres never became ready: %v", err)
@@ -83,7 +83,7 @@ func assertLedgerSchemaHealthy(t *testing.T, ctx context.Context, ownerDSN, appD
 	if err != nil {
 		t.Fatalf("could not connect for assertions: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	for _, table := range []string{"ledger_transactions", "ledger_entries", "account_balances_locked", "outbox"} {
 		var found int
@@ -127,7 +127,7 @@ func assertLedgerSchemaHealthy(t *testing.T, ctx context.Context, ownerDSN, appD
 	if err != nil {
 		t.Fatalf("could not connect as ledger_app: %v", err)
 	}
-	defer appConn.Close(ctx)
+	defer func() { _ = appConn.Close(ctx) }()
 
 	assertDenied := func(name, sql string) {
 		t.Helper()

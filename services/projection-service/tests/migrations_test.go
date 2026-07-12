@@ -44,7 +44,7 @@ func TestProjectionMigrationsApplyCleanly(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		defer conn.Close(ctx)
+		defer func() { _ = conn.Close(ctx) }()
 		return conn.Ping(ctx)
 	}); err != nil {
 		t.Fatalf("postgres never became ready: %v", err)
@@ -62,7 +62,7 @@ func TestProjectionMigrationsApplyCleanly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not connect for assertions: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	for _, table := range []string{"wallet_balances", "projection_offsets"} {
 		var found int
@@ -85,7 +85,7 @@ func TestProjectionMigrationsApplyCleanly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not connect as projection_app: %v", err)
 	}
-	defer appConn.Close(ctx)
+	defer func() { _ = appConn.Close(ctx) }()
 
 	if _, err := appConn.Exec(ctx, "DELETE FROM projection_db.wallet_balances"); err != nil {
 		t.Errorf("expected projection_app to retain DELETE on wallet_balances (rebuild flow), got: %v", err)

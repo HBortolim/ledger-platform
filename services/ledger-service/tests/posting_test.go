@@ -119,17 +119,23 @@ func TestPostingRepository(t *testing.T) {
 		}
 
 		var txCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", txID).Scan(&txCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", txID).Scan(&txCount); err != nil {
+			t.Fatalf("count ledger_transactions: %v", err)
+		}
 		if txCount != 0 {
 			t.Errorf("ledger_transactions count after failed unbalanced post = %d, want 0", txCount)
 		}
 		var entryCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_entries WHERE transaction_id = $1", txID).Scan(&entryCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_entries WHERE transaction_id = $1", txID).Scan(&entryCount); err != nil {
+			t.Fatalf("count ledger_entries: %v", err)
+		}
 		if entryCount != 0 {
 			t.Errorf("ledger_entries count after failed unbalanced post = %d, want 0", entryCount)
 		}
 		var outboxCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.outbox WHERE key = $1", txID.String()).Scan(&outboxCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.outbox WHERE key = $1", txID.String()).Scan(&outboxCount); err != nil {
+			t.Fatalf("count outbox: %v", err)
+		}
 		if outboxCount != 0 {
 			t.Errorf("outbox count after failed unbalanced post = %d, want 0", outboxCount)
 		}
@@ -151,7 +157,9 @@ func TestPostingRepository(t *testing.T) {
 		}
 
 		var txCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", tx.ID).Scan(&txCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", tx.ID).Scan(&txCount); err != nil {
+			t.Fatalf("count ledger_transactions: %v", err)
+		}
 		if txCount != 0 {
 			t.Errorf("ledger_transactions count = %d, want 0", txCount)
 		}
@@ -179,7 +187,9 @@ func TestPostingRepository(t *testing.T) {
 		}
 
 		var entryCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_entries WHERE transaction_id = $1", tx.ID).Scan(&entryCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_entries WHERE transaction_id = $1", tx.ID).Scan(&entryCount); err != nil {
+			t.Fatalf("count ledger_entries: %v", err)
+		}
 		if entryCount != len(tx.Entries) {
 			t.Errorf("ledger_entries count after duplicate attempt = %d, want %d (unchanged)", entryCount, len(tx.Entries))
 		}
@@ -295,13 +305,17 @@ func TestPostingRepository(t *testing.T) {
 		}
 
 		var txCount int
-		pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", txID).Scan(&txCount)
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", txID).Scan(&txCount); err != nil {
+			t.Fatalf("count ledger_transactions: %v", err)
+		}
 		if txCount != 0 {
 			t.Errorf("ledger_transactions count = %d, want 0", txCount)
 		}
 
 		var balanceB string
-		pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", accountB).Scan(&balanceB)
+		if err := pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", accountB).Scan(&balanceB); err != nil {
+			t.Fatalf("query account B balance: %v", err)
+		}
 		if balanceB != "200.00" {
 			t.Errorf("account B balance = %s, want unchanged 200.00 (mid-flow failure must roll back every account, not just the failing one)", balanceB)
 		}

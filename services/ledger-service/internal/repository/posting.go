@@ -185,7 +185,7 @@ func upsertAccountLocks(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) error {
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 	for range ids {
 		if _, err := br.Exec(); err != nil {
 			return fmt.Errorf("upsert account lock: %w", err)
@@ -260,7 +260,7 @@ func insertLedgerEntries(ctx context.Context, tx pgx.Tx, entries []domain.Ledger
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 	for range entries {
 		if _, err := br.Exec(); err != nil {
 			return fmt.Errorf("insert ledger_entry: %w", err)
@@ -288,7 +288,7 @@ func applyBalanceDeltas(ctx context.Context, tx pgx.Tx, entries []domain.LedgerE
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
-	defer br.Close()
+	defer func() { _ = br.Close() }()
 	for range deltas {
 		if _, err := br.Exec(); err != nil {
 			return fmt.Errorf("update locked balance: %w", err)

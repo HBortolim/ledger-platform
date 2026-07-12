@@ -37,7 +37,9 @@ func TestLedgerMigrationsDownUpRoundTrip(t *testing.T) {
 	err = conn.QueryRow(ctx,
 		"SELECT count(*) FROM information_schema.schemata WHERE schema_name = 'ledger_db'",
 	).Scan(&schemaCount)
-	conn.Close(ctx)
+	if err := conn.Close(ctx); err != nil {
+		t.Fatalf("could not close connection: %v", err)
+	}
 	if err != nil || schemaCount != 0 {
 		t.Fatalf("expected ledger_db schema to be gone after Down, err=%v found=%d", err, schemaCount)
 	}
