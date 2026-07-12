@@ -18,10 +18,10 @@ const (
 type TransactionType string
 
 const (
-	TransactionTransfer    TransactionType = "TRANSFER"
-	TransactionDeposit     TransactionType = "DEPOSIT"
-	TransactionWithdrawal  TransactionType = "WITHDRAWAL"
-	TransactionReversal    TransactionType = "REVERSAL"
+	TransactionTransfer   TransactionType = "TRANSFER"
+	TransactionDeposit    TransactionType = "DEPOSIT"
+	TransactionWithdrawal TransactionType = "WITHDRAWAL"
+	TransactionReversal   TransactionType = "REVERSAL"
 )
 
 type LedgerEntry struct {
@@ -34,12 +34,12 @@ type LedgerEntry struct {
 }
 
 type LedgerTransaction struct {
-	ID                   uuid.UUID
-	Type                 TransactionType
+	ID                    uuid.UUID
+	Type                  TransactionType
 	ReversesTransactionID *uuid.UUID
-	Description          string
-	Entries              []LedgerEntry
-	CreatedAt            time.Time
+	Description           string
+	Entries               []LedgerEntry
+	CreatedAt             time.Time
 }
 
 func (t *LedgerTransaction) ValidateBalance() error {

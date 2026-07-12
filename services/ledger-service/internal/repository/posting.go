@@ -40,9 +40,8 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 		return err
 	}
 
-	// Step 2: Acquire FOR UPDATE on every DEBIT account, sorted to prevent deadlocks (ADR-002).
-	debitIDs := sortedDebitIDs(tx.Entries)
-	lockedBalances, err := lockDebitAccounts(ctx, dbtx, debitIDs)
+	// Step 2: Acquire FOR UPDATE on every account referenced — DEBIT *and* CREDIT — sorted
+	lockedBalances, err := lockAccounts(ctx, dbtx, sortedAccountIDs(tx.Entries))
 	if err != nil {
 		return err
 	}
@@ -165,17 +164,10 @@ func allAccountIDs(entries []domain.LedgerEntry) []uuid.UUID {
 	return ids
 }
 
-func sortedDebitIDs(entries []domain.LedgerEntry) []uuid.UUID {
-	seen := make(map[uuid.UUID]struct{})
-	var ids []uuid.UUID
-	for _, e := range entries {
-		if e.EntryType == domain.Debit {
-			if _, ok := seen[e.AccountID]; !ok {
-				seen[e.AccountID] = struct{}{}
-				ids = append(ids, e.AccountID)
-			}
-		}
-	}
+// sortedAccountIDs dedupes every distinct account referenced across all
+// entries — DEBIT *and* CREDIT — and sorts them for a globally consistent
+func sortedAccountIDs(entries []domain.LedgerEntry) []uuid.UUID {
+	ids := allAccountIDs(entries)
 	sort.Slice(ids, func(i, j int) bool {
 		return ids[i].String() < ids[j].String()
 	})
@@ -202,9 +194,9 @@ func upsertAccountLocks(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) error {
 	return br.Close()
 }
 
-// lockDebitAccounts issues SELECT … FOR UPDATE on each debit account in sorted order.
-// Sorting prevents deadlocks when concurrent transactions target the same set of accounts.
-func lockDebitAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]decimal.Decimal, error) {
+// lockAccounts issues SELECT … FOR UPDATE on each given account in sorted order.
+// Sorting prevents deadlocks when concurrent transactions target overlapping account sets.
+func lockAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]decimal.Decimal, error) {
 	balances := make(map[uuid.UUID]decimal.Decimal, len(ids))
 	for _, id := range ids {
 		var balStr string
