@@ -4,12 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/ledger-platform/ledger-service/internal/repository"
-	"github.com/ledger-platform/ledger-service/internal/service"
 )
 
-func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
+func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHandler) {
 	hc := r.Group("/health")
 	{
 		hc.GET("/live", live)
@@ -17,11 +14,6 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 	}
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
-	// Initialize posting handler with service
-	postingRepo := repository.NewPostingRepository(pool)
-	postingSvc := service.NewPostingService(postingRepo)
-	postingHandler := NewPostingHandler(postingSvc)
 
 	v1 := r.Group("/ledger")
 	v1.POST("/postings", postingHandler.PostPosting)
