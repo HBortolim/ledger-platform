@@ -66,9 +66,6 @@ func renderPosting(tx domain.LedgerTransaction) postingResponse {
 	}
 }
 
-// postingService is the subset of *service.PostingService this handler
-// needs. Declared here, the consumer, so tests can supply a fake without
-// touching the real service or repository.
 type postingService interface {
 	Post(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error)
 	GetTransaction(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error)

@@ -12,9 +12,6 @@ import (
 	"github.com/ledger-platform/ledger-service/internal/repository"
 )
 
-// PostingRepository is the subset of *repository.PostingRepository this
-// service needs. Declared here, the consumer, rather than in the repository
-// package — Go interfaces are sized to the caller, not the implementation.
 type PostingRepository interface {
 	Post(ctx context.Context, tx domain.LedgerTransaction) error
 	GetTransactionByID(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error)

@@ -16,8 +16,12 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHa
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	v1 := r.Group("/ledger")
-	v1.POST("/postings", postingHandler.PostPosting)
+	{
+		v1.POST("/postings", postingHandler.PostPosting)
+	}
 
 	admin := r.Group("/admin")
-	admin.GET("/ledger/transactions/:id", postingHandler.GetTransaction)
+	{
+		admin.GET("/ledger/transactions/:id", postingHandler.GetTransaction)
+	}
 }
