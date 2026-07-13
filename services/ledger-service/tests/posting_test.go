@@ -148,7 +148,7 @@ func TestPostingRepository(t *testing.T) {
 		tx := newBalancedTransfer(debit, credit, "100.00")
 		err := repo.Post(ctx, tx)
 
-		var insufficient repository.ErrInsufficientFunds
+		var insufficient domain.ErrInsufficientFunds
 		if !errors.As(err, &insufficient) {
 			t.Fatalf("Post() = %v, want ErrInsufficientFunds", err)
 		}
@@ -178,7 +178,7 @@ func TestPostingRepository(t *testing.T) {
 		dup.ID = tx.ID
 
 		err := repo.Post(ctx, dup)
-		var dupErr repository.ErrDuplicateTransaction
+		var dupErr domain.ErrDuplicateTransaction
 		if !errors.As(err, &dupErr) {
 			t.Fatalf("second Post() = %v, want ErrDuplicateTransaction", err)
 		}
@@ -226,7 +226,7 @@ func TestPostingRepository(t *testing.T) {
 
 	t.Run("GetTransactionByID/UnknownID", func(t *testing.T) {
 		_, err := repo.GetTransactionByID(ctx, uuid.New())
-		if !errors.Is(err, repository.ErrNotFound) {
+		if !errors.Is(err, domain.ErrNotFound) {
 			t.Errorf("GetTransactionByID() = %v, want ErrNotFound", err)
 		}
 	})
@@ -296,7 +296,7 @@ func TestPostingRepository(t *testing.T) {
 		}
 
 		err := repo.Post(ctx, tx)
-		var insufficient repository.ErrInsufficientFunds
+		var insufficient domain.ErrInsufficientFunds
 		if !errors.As(err, &insufficient) {
 			t.Fatalf("Post() = %v, want ErrInsufficientFunds", err)
 		}

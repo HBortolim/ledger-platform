@@ -1,4 +1,4 @@
-package repository
+package domain
 
 import (
 	"errors"
@@ -6,6 +6,9 @@ import (
 
 	"github.com/google/uuid"
 )
+
+// ErrNotFound is returned when a requested entity is absent.
+var ErrNotFound = errors.New("not found")
 
 // ErrInsufficientFunds is returned when a DEBIT account's locked balance cannot cover the posting.
 type ErrInsufficientFunds struct {
@@ -24,6 +27,3 @@ type ErrDuplicateTransaction struct {
 func (e ErrDuplicateTransaction) Error() string {
 	return fmt.Sprintf("transaction %s already exists", e.ID)
 }
-
-// ErrNotFound is returned when a requested entity is absent.
-var ErrNotFound = errors.New("not found")

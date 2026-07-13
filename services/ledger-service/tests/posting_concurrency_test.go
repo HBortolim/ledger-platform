@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/ledger-platform/ledger-service/internal/repository"
 )
 
@@ -49,7 +50,7 @@ func TestPostingConcurrency(t *testing.T) {
 			switch {
 			case err == nil:
 				successes++
-			case errors.As(err, &repository.ErrInsufficientFunds{}):
+			case errors.As(err, &domain.ErrInsufficientFunds{}):
 				failures++
 			default:
 				t.Fatalf("unexpected error: %v", err)

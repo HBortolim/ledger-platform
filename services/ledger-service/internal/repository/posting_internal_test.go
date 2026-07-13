@@ -98,7 +98,7 @@ func TestCheckAvailableBalance_Insufficient(t *testing.T) {
 	balances := map[uuid.UUID]decimal.Decimal{account: decimal.NewFromInt(100)}
 
 	err := checkAvailableBalance(entries, balances)
-	var insufficient ErrInsufficientFunds
+	var insufficient domain.ErrInsufficientFunds
 	if !errors.As(err, &insufficient) {
 		t.Fatalf("checkAvailableBalance() = %v, want ErrInsufficientFunds", err)
 	}
@@ -119,7 +119,7 @@ func TestCheckAvailableBalance_SumsMultipleDebitsAgainstSameAccount(t *testing.T
 	balances := map[uuid.UUID]decimal.Decimal{account: decimal.NewFromInt(100)}
 
 	err := checkAvailableBalance(entries, balances)
-	var insufficient ErrInsufficientFunds
+	var insufficient domain.ErrInsufficientFunds
 	if !errors.As(err, &insufficient) {
 		t.Fatalf("checkAvailableBalance() = %v, want ErrInsufficientFunds (60+60 > 100)", err)
 	}

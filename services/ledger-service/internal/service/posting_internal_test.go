@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
 )
 
 type fakeRepo struct {
@@ -123,7 +122,7 @@ func TestPost_DuplicateTransaction_PassesThroughTypedError(t *testing.T) {
 	txID := uuid.New()
 	repo := &fakeRepo{
 		postFunc: func(ctx context.Context, tx domain.LedgerTransaction) error {
-			return repository.ErrDuplicateTransaction{ID: txID}
+			return domain.ErrDuplicateTransaction{ID: txID}
 		},
 	}
 	svc := NewPostingService(repo)
@@ -134,9 +133,9 @@ func TestPost_DuplicateTransaction_PassesThroughTypedError(t *testing.T) {
 		Entries:       validEntries(debit, credit),
 	})
 
-	var dup repository.ErrDuplicateTransaction
+	var dup domain.ErrDuplicateTransaction
 	if !errors.As(err, &dup) {
-		t.Fatalf("Post() = %v, want repository.ErrDuplicateTransaction", err)
+		t.Fatalf("Post() = %v, want domain.ErrDuplicateTransaction", err)
 	}
 	if dup.ID != txID {
 		t.Errorf("ErrDuplicateTransaction.ID = %s, want %s", dup.ID, txID)
@@ -147,7 +146,7 @@ func TestPost_InsufficientFunds_PassesThroughTypedError(t *testing.T) {
 	debit, credit := uuid.New(), uuid.New()
 	repo := &fakeRepo{
 		postFunc: func(ctx context.Context, tx domain.LedgerTransaction) error {
-			return repository.ErrInsufficientFunds{AccountID: debit}
+			return domain.ErrInsufficientFunds{AccountID: debit}
 		},
 	}
 	svc := NewPostingService(repo)
@@ -158,9 +157,9 @@ func TestPost_InsufficientFunds_PassesThroughTypedError(t *testing.T) {
 		Entries:       validEntries(debit, credit),
 	})
 
-	var insufficient repository.ErrInsufficientFunds
+	var insufficient domain.ErrInsufficientFunds
 	if !errors.As(err, &insufficient) {
-		t.Fatalf("Post() = %v, want repository.ErrInsufficientFunds", err)
+		t.Fatalf("Post() = %v, want domain.ErrInsufficientFunds", err)
 	}
 	if insufficient.AccountID != debit {
 		t.Errorf("ErrInsufficientFunds.AccountID = %s, want %s", insufficient.AccountID, debit)

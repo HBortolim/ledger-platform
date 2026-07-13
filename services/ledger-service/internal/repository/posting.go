@@ -88,7 +88,7 @@ func (r *PostingRepository) GetTransactionByID(ctx context.Context, id uuid.UUID
 		id,
 	).Scan(&txType, &reversesID, &desc, &createdAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.LedgerTransaction{}, ErrNotFound
+		return domain.LedgerTransaction{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return domain.LedgerTransaction{}, fmt.Errorf("query transaction: %w", err)
@@ -228,7 +228,7 @@ func checkAvailableBalance(entries []domain.LedgerEntry, balances map[uuid.UUID]
 	}
 	for accountID, debitAmt := range totalDebit {
 		if balances[accountID].LessThan(debitAmt) {
-			return ErrInsufficientFunds{AccountID: accountID}
+			return domain.ErrInsufficientFunds{AccountID: accountID}
 		}
 	}
 	return nil
@@ -243,7 +243,7 @@ func insertLedgerTransaction(ctx context.Context, tx pgx.Tx, t domain.LedgerTran
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgErrUniqueViolation {
-			return ErrDuplicateTransaction{ID: t.ID}
+			return domain.ErrDuplicateTransaction{ID: t.ID}
 		}
 		return fmt.Errorf("insert ledger_transaction: %w", err)
 	}

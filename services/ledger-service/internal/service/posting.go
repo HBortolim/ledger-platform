@@ -9,7 +9,6 @@ import (
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/ledger-platform/ledger-service/internal/metrics"
-	"github.com/ledger-platform/ledger-service/internal/repository"
 )
 
 type PostingRepository interface {
@@ -79,8 +78,8 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 		metrics.PostingsTotal.WithLabelValues(string(tx.Type), status).Inc()
 	}()
 
-	var dupErr repository.ErrDuplicateTransaction
-	var insufficientErr repository.ErrInsufficientFunds
+	var dupErr          domain.ErrDuplicateTransaction
+	var insufficientErr domain.ErrInsufficientFunds
 
 	switch {
 	case postErr == nil:

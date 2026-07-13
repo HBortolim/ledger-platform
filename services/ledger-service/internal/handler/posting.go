@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
 	"github.com/ledger-platform/ledger-service/internal/service"
 )
 
@@ -110,8 +109,8 @@ func (h *PostingHandler) PostPosting(c *gin.Context) {
 }
 
 func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
-	var dupErr repository.ErrDuplicateTransaction
-	var insufficientErr repository.ErrInsufficientFunds
+	var dupErr          domain.ErrDuplicateTransaction
+	var insufficientErr domain.ErrInsufficientFunds
 	var unbalancedErr service.ErrUnbalanced
 	var invalidAmountErr service.ErrInvalidAmount
 
@@ -148,7 +147,7 @@ func (h *PostingHandler) GetTransaction(c *gin.Context) {
 
 	tx, err := h.svc.GetTransaction(c.Request.Context(), id)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			c.JSON(http.StatusNotFound, errorResponse{Code: "NOT_FOUND"})
 			return
 		}

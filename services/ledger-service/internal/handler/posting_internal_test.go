@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
 	"github.com/ledger-platform/ledger-service/internal/service"
 )
 
@@ -129,7 +128,7 @@ func TestPostPosting_Duplicate_Returns409WithOriginalPosting(t *testing.T) {
 	}
 	svc := &fakePostingService{
 		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, repository.ErrDuplicateTransaction{ID: txID}
+			return domain.LedgerTransaction{}, domain.ErrDuplicateTransaction{ID: txID}
 		},
 		getFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
 			return original, nil
@@ -161,7 +160,7 @@ func TestPostPosting_DuplicateButFetchFails_Returns503(t *testing.T) {
 	txID, debit, credit := uuid.New(), uuid.New(), uuid.New()
 	svc := &fakePostingService{
 		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, repository.ErrDuplicateTransaction{ID: txID}
+			return domain.LedgerTransaction{}, domain.ErrDuplicateTransaction{ID: txID}
 		},
 		getFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
 			return domain.LedgerTransaction{}, errors.New("connection refused")
@@ -220,7 +219,7 @@ func TestPostPosting_InsufficientFunds_Returns422InsufficientFundsCode(t *testin
 	txID, debit, credit := uuid.New(), uuid.New(), uuid.New()
 	svc := &fakePostingService{
 		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, repository.ErrInsufficientFunds{AccountID: debit}
+			return domain.LedgerTransaction{}, domain.ErrInsufficientFunds{AccountID: debit}
 		},
 	}
 	r := newTestRouter(svc)
@@ -320,7 +319,7 @@ func TestGetTransaction_Found_Returns200(t *testing.T) {
 func TestGetTransaction_NotFound_Returns404(t *testing.T) {
 	svc := &fakePostingService{
 		getFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, repository.ErrNotFound
+			return domain.LedgerTransaction{}, domain.ErrNotFound
 		},
 	}
 	r := newTestRouter(svc)
