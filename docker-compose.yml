@@ -65,6 +65,17 @@ services:
       timeout: 10s
       retries: 10
 
+  kafka-topics-init:
+    image: confluentinc/cp-kafka:7.6.0
+    volumes:
+      - ./infrastructure/kafka/create-topics.sh:/create-topics.sh:ro
+    environment:
+      KAFKA_BROKERS: kafka:29092
+    entrypoint: ["sh", "/create-topics.sh"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   wallet-service:
     build: ./services/wallet-service
     ports:
@@ -104,6 +115,8 @@ services:
       kafka:
         condition: service_healthy
       ledger-migrate:
+        condition: service_completed_successfully
+      kafka-topics-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health/live"]

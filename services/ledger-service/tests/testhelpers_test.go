@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -12,6 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ory/dockertest/v3"
+	dc "github.com/ory/dockertest/v3/docker"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 )
@@ -70,6 +74,86 @@ func setupLedgerDB(t *testing.T) (ownerDSN, appDSN string) {
 	}
 
 	return ownerDSN, appDSN
+}
+
+// setupKafka spins an ephemeral single-node KRaft Kafka broker via dockertest
+// and returns its host-reachable bootstrap address. KRaft's advertised
+// listener must be known at container boot, so this binds a fixed host port
+// rather than using dockertest's dynamic port assignment.
+func setupKafka(t *testing.T) (bootstrap string) {
+	t.Helper()
+
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		t.Fatalf("could not connect to docker: %v", err)
+	}
+
+	const hostPort = "19092"
+	bootstrap = "localhost:" + hostPort
+
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
+		Repository: "confluentinc/cp-kafka",
+		Tag:        "7.6.0",
+		Env: []string{
+			"KAFKA_NODE_ID=1",
+			"KAFKA_PROCESS_ROLES=broker,controller",
+			"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+			"KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093",
+			"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://" + bootstrap,
+			"KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER",
+			"KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT",
+			"KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093",
+			"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1",
+			"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1",
+			"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1",
+			"KAFKA_AUTO_CREATE_TOPICS_ENABLE=true",
+			"CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk",
+		},
+		ExposedPorts: []string{"9092/tcp"},
+		PortBindings: map[dc.Port][]dc.PortBinding{
+			"9092/tcp": {{HostIP: "0.0.0.0", HostPort: hostPort}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("could not start kafka container: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := pool.Purge(resource); err != nil {
+			t.Logf("could not purge kafka container: %v", err)
+		}
+	})
+
+	pool.MaxWait = 60 * time.Second
+	if err := pool.Retry(func() error {
+		cl, err := kgo.NewClient(kgo.SeedBrokers(bootstrap))
+		if err != nil {
+			return err
+		}
+		defer cl.Close()
+		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return cl.Ping(pingCtx)
+	}); err != nil {
+		t.Fatalf("kafka never became ready: %v", err)
+	}
+
+	// Explicitly provision the topic rather than relying on auto-create:
+	// auto-create can leave a brief window where a producer's first request
+	// still sees UNKNOWN_TOPIC_OR_PARTITION while the broker creates it
+	// asynchronously. This mirrors the production kafka-topics-init step.
+	adminCl, err := kgo.NewClient(kgo.SeedBrokers(bootstrap))
+	if err != nil {
+		t.Fatalf("kgo.NewClient() (admin) = error %v, want nil", err)
+	}
+	defer adminCl.Close()
+	admin := kadm.NewClient(adminCl)
+	createCtx, createCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer createCancel()
+	if _, err := admin.CreateTopics(createCtx, 1, 1, nil, "ledger.posted.v1"); err != nil {
+		t.Fatalf("could not create test topic: %v", err)
+	}
+
+	return bootstrap
 }
 
 // assertLedgerSchemaHealthy asserts the full set of schema/seed/grant/privilege

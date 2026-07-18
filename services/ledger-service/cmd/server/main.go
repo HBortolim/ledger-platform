@@ -10,6 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ledger-platform/ledger-service/internal/config"
 	"github.com/ledger-platform/ledger-service/internal/handler"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
@@ -32,6 +35,24 @@ func main() {
 	}
 	defer pool.Close()
 
+	producer, err := kgo.NewClient(
+		kgo.SeedBrokers(cfg.KafkaBrokers...),
+		kgo.ClientID("ledger-service-outbox-worker"),
+		kgo.RequiredAcks(kgo.AllISRAcks()),
+		kgo.AllowIdempotentProduceCancellation(),
+	)
+	if err != nil {
+		log.Fatalf("cannot create kafka producer: %v", err)
+	}
+	defer func() {
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer flushCancel()
+		if err := producer.Flush(flushCtx); err != nil {
+			log.Printf("kafka flush error: %v", err)
+		}
+		producer.Close()
+	}()
+
 	postingRepo := repository.NewPostingRepository(pool)
 	postingSvc := service.NewPostingService(postingRepo)
 	postingHandler := handler.NewPostingHandler(postingSvc)
@@ -41,18 +62,23 @@ func main() {
 
 	handler.RegisterRoutes(router, pool, postingHandler)
 
-	go registerWorkers(ctx)
-
 	srv := &http.Server{
 		Addr:    cfg.AppPort,
 		Handler: router,
 	}
 
-	go func() {
+	worker := outbox.NewWorker(pool, producer)
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return worker.Run(gctx)
+	})
+	g.Go(func() error {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			return err
 		}
-	}()
+		return nil
+	})
 
 	<-ctx.Done()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -60,9 +86,8 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
-}
 
-func registerWorkers(ctx context.Context) {
-	worker := outbox.NewWorker()
-	worker.Run(ctx)
+	if err := g.Wait(); err != nil {
+		log.Printf("worker group error: %v", err)
+	}
 }

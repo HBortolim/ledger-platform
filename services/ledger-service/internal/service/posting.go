@@ -101,9 +101,6 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 	}
 }
 
-// GetTransaction is a thin passthrough to the repository, used both by
-// GET /admin/ledger/transactions/:id and by the handler's 409 response
-// (which echoes the original posting for client comparison — SPEC.md §7.1).
 func (s *PostingService) GetTransaction(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
 	return s.repo.GetTransactionByID(ctx, id)
 }
