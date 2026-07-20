@@ -4,20 +4,23 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func RegisterRoutes(r *gin.Engine) {
-	r.GET("/health/live", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "UP"})
-	})
-	r.GET("/health/ready", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "UP"})
-	})
+func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool) {
+	hc := r.Group("/health")
+	{
+		hc.GET("/live", live)
+		hc.GET("/ready", ready(pool))
+	}
+	
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	admin := r.Group("/admin/projections")
-	admin.POST("/:walletId/rebuild", RebuildProjection)
+	{
+		admin.POST("/:walletId/rebuild", RebuildProjection)
+	}
 }
 
 func RebuildProjection(c *gin.Context) {
