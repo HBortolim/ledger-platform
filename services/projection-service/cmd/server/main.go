@@ -36,7 +36,7 @@ func main() {
 	handler.RegisterRoutes(router, pool)
 
 	go func() {
-		c := consumer.NewLedgerPostedConsumer()
+		c := consumer.NewLedgerPostedConsumer(pool, config)
 		c.Run(ctx)
 	}()
 
