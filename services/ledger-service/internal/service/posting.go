@@ -80,6 +80,7 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 
 	var dupErr          domain.ErrDuplicateTransaction
 	var insufficientErr domain.ErrInsufficientFunds
+	var dailyCapErr     domain.ErrDailyCapExceeded
 
 	switch {
 	case postErr == nil:
@@ -96,6 +97,9 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 	case errors.As(postErr, &insufficientErr):
 		status = "rejected"
 		return domain.LedgerTransaction{}, insufficientErr
+	case errors.As(postErr, &dailyCapErr):
+		status = "rejected"
+		return domain.LedgerTransaction{}, dailyCapErr
 	default:
 		return domain.LedgerTransaction{}, postErr
 	}

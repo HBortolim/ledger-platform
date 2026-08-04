@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/ledger-platform/ledger-service/internal/service"
@@ -230,6 +231,27 @@ func TestPostPosting_InsufficientFunds_Returns422InsufficientFundsCode(t *testin
 	r.ServeHTTP(w, req)
 
 	assertErrorCode(t, w, http.StatusUnprocessableEntity, "INSUFFICIENT_FUNDS")
+}
+
+func TestPostPosting_DailyCapExceeded_Returns422DailyLimitExceededCode(t *testing.T) {
+	txID, debit, credit := uuid.New(), uuid.New(), uuid.New()
+	svc := &fakePostingService{
+		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
+			return domain.LedgerTransaction{}, domain.ErrDailyCapExceeded{
+				AccountID: debit,
+				Limit:     decimal.RequireFromString("100000.00"),
+				Attempted: decimal.RequireFromString("100050.00"),
+			}
+		},
+	}
+	r := newTestRouter(svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/ledger/postings", bytes.NewReader(validPostBody(txID, debit, credit)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assertErrorCode(t, w, http.StatusUnprocessableEntity, "DAILY_LIMIT_EXCEEDED")
 }
 
 func TestPostPosting_OpaqueError_Returns503WithRetryAfter(t *testing.T) {

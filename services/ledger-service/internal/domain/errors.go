@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // ErrNotFound is returned when a requested entity is absent.
@@ -26,4 +27,16 @@ type ErrDuplicateTransaction struct {
 
 func (e ErrDuplicateTransaction) Error() string {
 	return fmt.Sprintf("transaction %s already exists", e.ID)
+}
+
+// ErrDailyCapExceeded is returned when a DEBIT account's cumulative debits for the current
+// day, including this posting, would exceed the configured daily transfer cap.
+type ErrDailyCapExceeded struct {
+	AccountID uuid.UUID
+	Limit     decimal.Decimal
+	Attempted decimal.Decimal
+}
+
+func (e ErrDailyCapExceeded) Error() string {
+	return fmt.Sprintf("daily transfer cap exceeded for account %s: attempted %s, limit %s", e.AccountID, e.Attempted, e.Limit)
 }

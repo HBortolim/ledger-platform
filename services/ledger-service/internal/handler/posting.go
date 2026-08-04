@@ -111,6 +111,7 @@ func (h *PostingHandler) PostPosting(c *gin.Context) {
 func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
 	var dupErr          domain.ErrDuplicateTransaction
 	var insufficientErr domain.ErrInsufficientFunds
+	var dailyCapErr domain.ErrDailyCapExceeded
 	var unbalancedErr service.ErrUnbalanced
 	var invalidAmountErr service.ErrInvalidAmount
 
@@ -128,6 +129,8 @@ func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
 		c.JSON(http.StatusUnprocessableEntity, errorResponse{Code: "INVALID_AMOUNT", Message: invalidAmountErr.Error()})
 	case errors.As(err, &insufficientErr):
 		c.JSON(http.StatusUnprocessableEntity, errorResponse{Code: "INSUFFICIENT_FUNDS", Message: insufficientErr.Error()})
+	case errors.As(err, &dailyCapErr):
+		c.JSON(http.StatusUnprocessableEntity, errorResponse{Code: "DAILY_LIMIT_EXCEEDED", Message: dailyCapErr.Error()})
 	default:
 		h.renderDBUnavailable(c)
 	}

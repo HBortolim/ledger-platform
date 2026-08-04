@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/ledger-platform/ledger-service/internal/repository"
@@ -28,7 +29,7 @@ func TestPostingRepository(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool)
+	repo := repository.NewPostingRepository(pool, testDailyCap)
 
 	t.Run("BalancedTransaction/PersistsEntriesAndOutbox", func(t *testing.T) {
 		debit, credit := uuid.New(), uuid.New()
@@ -162,6 +163,47 @@ func TestPostingRepository(t *testing.T) {
 		}
 		if txCount != 0 {
 			t.Errorf("ledger_transactions count = %d, want 0", txCount)
+		}
+	})
+
+	t.Run("DailyCapExceeded/ReturnsTypedError", func(t *testing.T) {
+		// Own repo instance with a tight cap — the outer repo uses testDailyCap
+		// (generously high) so this subtest's cap doesn't leak into the others.
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"))
+
+		debit, credit := uuid.New(), uuid.New()
+		seedAccountBalance(t, pool, debit, "10000.00") // plenty of balance headroom; only the cap should trigger
+
+		first := newBalancedTransfer(debit, credit, "60.00")
+		if err := cappedRepo.Post(ctx, first); err != nil {
+			t.Fatalf("first Post() = error %v, want nil", err)
+		}
+
+		second := newBalancedTransfer(debit, credit, "50.00") // 60 + 50 = 110 > 100 cap
+		err := cappedRepo.Post(ctx, second)
+
+		var capExceeded domain.ErrDailyCapExceeded
+		if !errors.As(err, &capExceeded) {
+			t.Fatalf("second Post() = %v, want ErrDailyCapExceeded", err)
+		}
+		if capExceeded.AccountID != debit {
+			t.Errorf("ErrDailyCapExceeded.AccountID = %s, want %s", capExceeded.AccountID, debit)
+		}
+
+		var txCount int
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM ledger_db.ledger_transactions WHERE id = $1", second.ID).Scan(&txCount); err != nil {
+			t.Fatalf("count ledger_transactions: %v", err)
+		}
+		if txCount != 0 {
+			t.Errorf("ledger_transactions count for rejected posting = %d, want 0", txCount)
+		}
+
+		var debitBalance string
+		if err := pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", debit).Scan(&debitBalance); err != nil {
+			t.Fatalf("query debit balance: %v", err)
+		}
+		if debitBalance != "9940.00" {
+			t.Errorf("debit balance = %s, want 9940.00 (only the first, successful 60.00 debit applied)", debitBalance)
 		}
 	})
 

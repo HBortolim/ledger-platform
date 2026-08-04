@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 type Config struct {
-	DatabaseURL  string
-	KafkaBrokers []string
-	AppPort      string
+	DatabaseURL      string
+	KafkaBrokers     []string
+	AppPort          string
+	DailyTransferCap decimal.Decimal
 }
 
 func Load() (*Config, error) {
@@ -28,9 +31,19 @@ func Load() (*Config, error) {
 		port = "8081"
 	}
 
+	capStr := os.Getenv("DAILY_TRANSFER_CAP")
+	if capStr == "" {
+		capStr = "100000.00"
+	}
+	dailyCap, err := decimal.NewFromString(capStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid DAILY_TRANSFER_CAP %q: %w", capStr, err)
+	}
+
 	return &Config{
-		DatabaseURL:  dbURL,
-		KafkaBrokers: strings.Split(brokers, ","),
-		AppPort:      ":" + port,
+		DatabaseURL:      dbURL,
+		KafkaBrokers:     strings.Split(brokers, ","),
+		AppPort:          ":" + port,
+		DailyTransferCap: dailyCap,
 	}, nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 )
@@ -163,6 +164,32 @@ func TestPost_InsufficientFunds_PassesThroughTypedError(t *testing.T) {
 	}
 	if insufficient.AccountID != debit {
 		t.Errorf("ErrInsufficientFunds.AccountID = %s, want %s", insufficient.AccountID, debit)
+	}
+}
+
+func TestPost_DailyCapExceeded_PassesThroughTypedError(t *testing.T) {
+	debit, credit := uuid.New(), uuid.New()
+	limit := decimal.RequireFromString("100.00")
+	attempted := decimal.RequireFromString("150.00")
+	repo := &fakeRepo{
+		postFunc: func(ctx context.Context, tx domain.LedgerTransaction) error {
+			return domain.ErrDailyCapExceeded{AccountID: debit, Limit: limit, Attempted: attempted}
+		},
+	}
+	svc := NewPostingService(repo)
+
+	_, err := svc.Post(context.Background(), PostInput{
+		TransactionID: uuid.New(),
+		Type:          "TRANSFER",
+		Entries:       validEntries(debit, credit),
+	})
+
+	var capExceeded domain.ErrDailyCapExceeded
+	if !errors.As(err, &capExceeded) {
+		t.Fatalf("Post() = %v, want domain.ErrDailyCapExceeded", err)
+	}
+	if capExceeded.AccountID != debit {
+		t.Errorf("ErrDailyCapExceeded.AccountID = %s, want %s", capExceeded.AccountID, debit)
 	}
 }
 

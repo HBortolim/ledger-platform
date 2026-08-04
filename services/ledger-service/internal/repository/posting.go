@@ -20,11 +20,12 @@ import (
 const pgErrUniqueViolation = "23505"
 
 type PostingRepository struct {
-	pool *pgxpool.Pool
+	pool     *pgxpool.Pool
+	dailyCap decimal.Decimal
 }
 
-func NewPostingRepository(pool *pgxpool.Pool) *PostingRepository {
-	return &PostingRepository{pool: pool}
+func NewPostingRepository(pool *pgxpool.Pool, dailyCap decimal.Decimal) *PostingRepository {
+	return &PostingRepository{pool: pool, dailyCap: dailyCap}
 }
 
 // Post atomically writes a LedgerTransaction: entries, locked-balance update, and outbox row.
@@ -48,6 +49,12 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 
 	// Step 3: Available-balance check — cached balance minus total debit must be non-negative.
 	if err := checkAvailableBalance(tx.Entries, lockedBalances); err != nil {
+		return err
+	}
+
+	// Step 3.5: Daily per-account transfer cap, same locked transaction as the balance check
+	// above — closes the TOCTOU race an unlocked pre-check outside this transaction would have.
+	if err := checkDailyTransferCap(ctx, dbtx, tx.Entries, r.dailyCap); err != nil {
 		return err
 	}
 
@@ -229,6 +236,42 @@ func checkAvailableBalance(entries []domain.LedgerEntry, balances map[uuid.UUID]
 	for accountID, debitAmt := range totalDebit {
 		if balances[accountID].LessThan(debitAmt) {
 			return domain.ErrInsufficientFunds{AccountID: accountID}
+		}
+	}
+	return nil
+}
+
+// checkDailyTransferCap sums each DEBIT account's committed debits for the current day plus
+// this posting's own debit amount, and rejects if that total exceeds dailyCap. Runs inside the
+// same locked transaction as checkAvailableBalance (called after lockAccounts), so a concurrent
+// posting against the same account can't slip past both checks with a stale read.
+func checkDailyTransferCap(ctx context.Context, tx pgx.Tx, entries []domain.LedgerEntry, dailyCap decimal.Decimal) error {
+	debitTotals := make(map[uuid.UUID]decimal.Decimal)
+	for _, e := range entries {
+		if e.EntryType == domain.Debit {
+			debitTotals[e.AccountID] = debitTotals[e.AccountID].Add(e.Amount.Decimal())
+		}
+	}
+	for accountID, amount := range debitTotals {
+		var sumStr string
+		err := tx.QueryRow(ctx,
+			`SELECT COALESCE(SUM(amount),0)::text
+			   FROM ledger_db.ledger_entries
+			  WHERE account_id = $1
+			    AND entry_type = 'DEBIT'
+			    AND created_at >= date_trunc('day', now())`,
+			accountID,
+		).Scan(&sumStr)
+		if err != nil {
+			return fmt.Errorf("sum today's debits for %s: %w", accountID, err)
+		}
+		todaysDebits, err := decimal.NewFromString(sumStr)
+		if err != nil {
+			return fmt.Errorf("parse today's debits for %s: %w", accountID, err)
+		}
+		attempted := todaysDebits.Add(amount)
+		if attempted.GreaterThan(dailyCap) {
+			return domain.ErrDailyCapExceeded{AccountID: accountID, Limit: dailyCap, Attempted: attempted}
 		}
 	}
 	return nil

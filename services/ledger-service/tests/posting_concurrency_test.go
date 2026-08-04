@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/ledger-platform/ledger-service/internal/repository"
@@ -28,7 +29,7 @@ func TestPostingConcurrency(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool)
+	repo := repository.NewPostingRepository(pool, testDailyCap)
 
 	t.Run("ConcurrentDebitsSameAccount/ExactlyOneSucceeds", func(t *testing.T) {
 		source := uuid.New()
@@ -66,6 +67,54 @@ func TestPostingConcurrency(t *testing.T) {
 		}
 		if finalBalance != "40.00" {
 			t.Errorf("final source balance = %s, want 40.00 (100.00 seed - exactly one 60.00 debit)", finalBalance)
+		}
+	})
+
+	t.Run("ConcurrentTransfersNearDailyCap/ExactlyOneSucceeds", func(t *testing.T) {
+		// Direct proof that moving the cap check inside the locked transaction
+		// (ADR-0011) closes the TOCTOU race: plenty of *balance* headroom, but a
+		// tight daily cap that only one of the two concurrent transfers fits under.
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"))
+
+		source := uuid.New()
+		destA, destB := uuid.New(), uuid.New()
+		seedAccountBalance(t, pool, source, "1000000.00")
+
+		txA := newBalancedTransfer(source, destA, "60.00")
+		txB := newBalancedTransfer(source, destB, "60.00")
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		wg.Add(2)
+		go func() { defer wg.Done(); errs[0] = cappedRepo.Post(ctx, txA) }()
+		go func() { defer wg.Done(); errs[1] = cappedRepo.Post(ctx, txB) }()
+		wg.Wait()
+
+		successes, failures := 0, 0
+		for _, err := range errs {
+			switch {
+			case err == nil:
+				successes++
+			case errors.As(err, &domain.ErrDailyCapExceeded{}):
+				failures++
+			default:
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+		if successes != 1 || failures != 1 {
+			t.Fatalf("got %d successes, %d daily-cap failures; want exactly 1 and 1 (never both succeed, never both fail)", successes, failures)
+		}
+
+		var todaysDebits string
+		if err := pool.QueryRow(ctx,
+			`SELECT COALESCE(SUM(amount),0)::text FROM ledger_db.ledger_entries
+			  WHERE account_id = $1 AND entry_type = 'DEBIT' AND created_at >= date_trunc('day', now())`,
+			source,
+		).Scan(&todaysDebits); err != nil {
+			t.Fatalf("today's debits query: %v", err)
+		}
+		if todaysDebits != "60.00" {
+			t.Errorf("today's debits for source = %s, want 60.00 (exactly one 60.00 transfer applied, not 120.00)", todaysDebits)
 		}
 	})
 

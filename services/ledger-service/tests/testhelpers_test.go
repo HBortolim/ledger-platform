@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ory/dockertest/v3"
 	dc "github.com/ory/dockertest/v3/docker"
+	"github.com/shopspring/decimal"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 
@@ -22,6 +23,11 @@ import (
 
 
 var systemFundingAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
+// testDailyCap is the shared, generously-high daily transfer cap used by tests that don't
+// specifically exercise the cap itself — those construct their own PostingRepository instance
+// with a tighter cap (see posting_test.go's DailyCapExceeded subtest).
+var testDailyCap = decimal.RequireFromString("100000.00")
 
 // setupLedgerDB spins an ephemeral Postgres container via dockertest, applies
 // services/ledger-service/migrations/ against it as the owner role (`ledger`),
@@ -245,6 +251,17 @@ func assertLedgerSchemaHealthy(t *testing.T, ctx context.Context, ownerDSN, appD
 	assertAllowed("INSERT on outbox", "INSERT INTO ledger_db.outbox(topic, key, payload) VALUES ('test.topic', 'grant-check', '{}'::jsonb)")
 	assertAllowed("UPDATE on outbox", "UPDATE ledger_db.outbox SET published_at = now() WHERE key = 'grant-check'")
 	assertAllowed("DELETE on outbox", "DELETE FROM ledger_db.outbox WHERE key = 'grant-check'")
+
+	// wallet_app has no grants on ledger_db here (ADR-0011): the daily-cap query that
+	// justified an early cross-schema read grant moved into this service's own locked
+	// transaction, so the grant was revoked as unused (least privilege). Task 06 will
+	// (re)introduce a scoped wallet_app -> ledger_db.ledger_entries read grant of its
+	// own when the balance-endpoint freshness join actually needs it.
+	var walletAppRoleExists int
+	err = conn.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolname = 'wallet_app'").Scan(&walletAppRoleExists)
+	if err != nil || walletAppRoleExists != 0 {
+		t.Errorf("expected no wallet_app role in ledger-service's own DB (nothing here creates it anymore), err=%v found=%d", err, walletAppRoleExists)
+	}
 }
 
 // seedAccountBalance gives accountID a starting balance directly via SQL.

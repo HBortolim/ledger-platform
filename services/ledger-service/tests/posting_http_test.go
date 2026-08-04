@@ -36,7 +36,7 @@ func TestPostingHTTP(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool)
+	repo := repository.NewPostingRepository(pool, testDailyCap)
 	svc := service.NewPostingService(repo)
 	h := handler.NewPostingHandler(svc)
 
