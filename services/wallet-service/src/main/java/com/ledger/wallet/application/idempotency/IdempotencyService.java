@@ -32,7 +32,6 @@ public class IdempotencyService {
         this(repository, Duration.ofHours(properties.ttlHours()), DEFAULT_MAX_WAIT, DEFAULT_POLL_INTERVAL);
     }
 
-    /** Package-visible so tests can exercise the in-flight wait without a real 5s sleep. */
     IdempotencyService(IdempotencyRepository repository, Duration ttl, Duration maxWait, Duration pollInterval) {
         this.repository = repository;
         this.ttl = ttl;

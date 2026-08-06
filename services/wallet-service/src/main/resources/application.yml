@@ -49,7 +49,6 @@ ledger:
   idempotency:
     ttl-hours: 24
     pending-sweep-seconds: 60
-  daily-transfer-cap: 100000.00
 
 jwt:
   public-key-path: ${JWT_PUBLIC_KEY_PATH:keys/public.pem}

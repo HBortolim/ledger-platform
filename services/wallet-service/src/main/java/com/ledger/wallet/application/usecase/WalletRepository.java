@@ -10,4 +10,7 @@ public interface WalletRepository {
     void save(Wallet wallet);
 
     Optional<Wallet> getById(UUID walletId, UUID ownerId);
+
+    /** Owner-agnostic lookup — for a transfer's destination wallet, which the caller needn't own. */
+    Optional<Wallet> getById(UUID walletId);
 }

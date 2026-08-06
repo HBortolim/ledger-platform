@@ -18,7 +18,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class BaseIntegrationTest {
 
     // Singleton container pattern: started once per JVM, never stopped, so it outlives any single IT class.
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
+    // protected (not package-private): subclasses outside this package need the owner credentials
+    // to set up cross-schema fixtures (e.g. ledger_db, which only ledger-service's own migrations own).
+    protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
 
     static {
         postgres.start();

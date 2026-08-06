@@ -7,8 +7,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,15 +52,29 @@ public class WalletJdbcRepository implements WalletRepository {
                 .addValue("id", walletId)
                 .addValue("ownerId", ownerId);
 
-        List<Wallet> results = jdbc.query(sql, params, (rs, rowNum) -> new Wallet(
+        return jdbc.query(sql, params, WalletJdbcRepository::mapRow).stream().findFirst();
+    }
+
+    @Override
+    public Optional<Wallet> getById(UUID walletId) {
+        String sql = """
+                SELECT id, owner_id, currency, status, created_at, updated_at
+                FROM wallet_db.wallets
+                WHERE id = :id
+                """;
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("id", walletId);
+
+        return jdbc.query(sql, params, WalletJdbcRepository::mapRow).stream().findFirst();
+    }
+
+    private static Wallet mapRow(ResultSet rs, int rowNum) throws SQLException {
+        return new Wallet(
                 rs.getObject("id", UUID.class),
                 rs.getObject("owner_id", UUID.class),
                 rs.getString("currency"),
                 WalletStatus.valueOf(rs.getString("status")),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant()
-        ));
-
-        return results.stream().findFirst();
+        );
     }
 }
