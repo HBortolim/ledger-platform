@@ -28,7 +28,7 @@ public class IdempotencyJdbcRepository implements IdempotencyRepository {
                 INSERT INTO wallet_db.idempotency_records
                     (key, user_id, request_fingerprint, status, response_status, response_body, created_at, expires_at)
                 VALUES
-                    (:key, :userId, :fingerprint, :status, :responseStatus, :responseBody, :createdAt, :expiresAt)
+                    (:key, :userId, :fingerprint, :status, :responseStatus, :responseBody, :lastAppliedAt, :expiresAt)
                 """;
         jdbc.update(sql, paramsFor(record));
     }
@@ -96,7 +96,7 @@ public class IdempotencyJdbcRepository implements IdempotencyRepository {
                     request_fingerprint = :fingerprint,
                     response_status = :responseStatus,
                     response_body = :responseBody,
-                    created_at = :createdAt,
+                    created_at = :lastAppliedAt,
                     expires_at = :expiresAt
                 WHERE user_id = :userId AND key = :key
                 """;
@@ -130,7 +130,7 @@ public class IdempotencyJdbcRepository implements IdempotencyRepository {
                 .addValue("status", record.status().name())
                 .addValue("responseStatus", record.responseStatus())
                 .addValue("responseBody", record.responseBody())
-                .addValue("createdAt", Timestamp.from(record.createdAt()))
+                .addValue("lastAppliedAt", Timestamp.from(record.createdAt()))
                 .addValue("expiresAt", Timestamp.from(record.expiresAt()));
     }
 }
