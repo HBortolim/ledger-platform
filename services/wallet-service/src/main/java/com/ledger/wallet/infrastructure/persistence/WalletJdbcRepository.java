@@ -26,7 +26,7 @@ public class WalletJdbcRepository implements WalletRepository {
     public void save(Wallet wallet) {
         String sql = """
                 INSERT INTO wallet_db.wallets (id, owner_id, currency, status, created_at, updated_at)
-                VALUES (:id, :ownerId, :currency, :status, :lastAppliedAt, :updatedAt)
+                VALUES (:id, :ownerId, :currency, :status, :createdAt, :updatedAt)
                 """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
@@ -34,7 +34,7 @@ public class WalletJdbcRepository implements WalletRepository {
                 .addValue("ownerId", wallet.ownerId())
                 .addValue("currency", wallet.currency())
                 .addValue("status", wallet.status().name())
-                .addValue("lastAppliedAt", Timestamp.from(wallet.createdAt()))
+                .addValue("createdAt", Timestamp.from(wallet.createdAt()))
                 .addValue("updatedAt", Timestamp.from(wallet.updatedAt()));
 
         jdbc.update(sql, params);

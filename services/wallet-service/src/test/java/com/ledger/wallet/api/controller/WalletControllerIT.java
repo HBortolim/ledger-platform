@@ -32,7 +32,7 @@ class WalletControllerIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.walletId").exists())
                 .andExpect(jsonPath("$.currency").value("BRL"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.lastAppliedAt").exists());
+                .andExpect(jsonPath("$.createdAt").exists());
     }
 
     // AC-1.2: request without a valid JWT returns 401
@@ -131,7 +131,7 @@ class WalletControllerIT extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.walletId").value(walletId.toString()))
                 .andExpect(jsonPath("$.currency").value("BRL"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.lastAppliedAt").exists());
+                .andExpect(jsonPath("$.createdAt").exists());
     }
 
     @Test
