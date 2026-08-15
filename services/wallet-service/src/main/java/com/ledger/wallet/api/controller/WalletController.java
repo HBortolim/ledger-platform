@@ -1,9 +1,11 @@
 package com.ledger.wallet.api.controller;
 
+import com.ledger.wallet.api.dto.BalanceResponse;
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.api.dto.CreateWalletResponse;
 import com.ledger.wallet.api.dto.GetWalletResponse;
 import com.ledger.wallet.application.usecase.CreateWalletUseCase;
+import com.ledger.wallet.application.usecase.GetBalanceUseCase;
 import com.ledger.wallet.application.usecase.GetWalletUseCase;
 import com.ledger.wallet.infrastructure.security.AuthenticatedUser;
 import jakarta.validation.Valid;
@@ -25,10 +27,12 @@ public class WalletController {
 
     private final CreateWalletUseCase createWalletUseCase;
     private final GetWalletUseCase getWalletUseCase;
+    private final GetBalanceUseCase getBalanceUseCase;
 
-    public WalletController(CreateWalletUseCase createWalletUseCase, GetWalletUseCase getWalletUseCase) {
+    public WalletController(CreateWalletUseCase createWalletUseCase, GetWalletUseCase getWalletUseCase, GetBalanceUseCase getBalanceUseCase) {
         this.createWalletUseCase = createWalletUseCase;
         this.getWalletUseCase = getWalletUseCase;
+        this.getBalanceUseCase = getBalanceUseCase;
     }
 
     @PostMapping
@@ -50,9 +54,8 @@ public class WalletController {
     }
 
     @GetMapping("/{walletId}/balance")
-    public ResponseEntity<?> getBalance(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
-        // TODO: implement via use case
-        throw new UnsupportedOperationException("not yet implemented");
+    public ResponseEntity<BalanceResponse> getBalance(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(getBalanceUseCase.execute(walletId, principal));
     }
 
     @PostMapping("/{walletId}/freeze")
