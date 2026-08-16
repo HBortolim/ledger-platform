@@ -2,6 +2,7 @@ package com.ledger.wallet.application.idempotency;
 
 import com.ledger.wallet.domain.model.IdempotencyRecord;
 import com.ledger.wallet.domain.model.IdempotencyStatus;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -259,5 +260,61 @@ class IdempotencyServiceTest {
         service.markFailed(userId, "key-10");
 
         assertThat(repository.find(userId, "key-10").orElseThrow().status()).isEqualTo(IdempotencyStatus.FAILED);
+    }
+
+    @Test
+    void begin_new_incrementsIdempotencyHitsCounterWithNewResult() {
+        InMemoryIdempotencyRepository repository = new InMemoryIdempotencyRepository();
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IdempotencyService service = new IdempotencyService(repository, TTL, MAX_WAIT, POLL_INTERVAL, meterRegistry);
+        UUID userId = UUID.randomUUID();
+
+        service.begin(userId, "metrics-key-new", FINGERPRINT);
+
+        assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "new").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void begin_replay_incrementsIdempotencyHitsCounterWithReplayResult() {
+        InMemoryIdempotencyRepository repository = new InMemoryIdempotencyRepository();
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IdempotencyService service = new IdempotencyService(repository, TTL, MAX_WAIT, POLL_INTERVAL, meterRegistry);
+        UUID userId = UUID.randomUUID();
+
+        service.begin(userId, "metrics-key-replay", FINGERPRINT);
+        service.complete(userId, "metrics-key-replay", 201, "{}");
+        service.begin(userId, "metrics-key-replay", FINGERPRINT);
+
+        assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "replay").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void begin_mismatch_incrementsIdempotencyHitsCounterWithMismatchResult() {
+        InMemoryIdempotencyRepository repository = new InMemoryIdempotencyRepository();
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IdempotencyService service = new IdempotencyService(repository, TTL, MAX_WAIT, POLL_INTERVAL, meterRegistry);
+        UUID userId = UUID.randomUUID();
+
+        service.begin(userId, "metrics-key-mismatch", FINGERPRINT);
+        service.begin(userId, "metrics-key-mismatch", OTHER_FINGERPRINT);
+
+        assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "mismatch").count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void begin_inProgress_doesNotIncrementIdempotencyHitsCounter() {
+        InMemoryIdempotencyRepository repository = new InMemoryIdempotencyRepository();
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IdempotencyService service = new IdempotencyService(repository, TTL, MAX_WAIT, POLL_INTERVAL, meterRegistry);
+        UUID userId = UUID.randomUUID();
+
+        service.begin(userId, "metrics-key-inprogress", FINGERPRINT);
+        service.begin(userId, "metrics-key-inprogress", FINGERPRINT); // times out -> InProgress
+
+        assertThat(meterRegistry.find("wallet_idempotency_hits_total").tag("result", "in_progress").counter())
+                .isNull();
     }
 }

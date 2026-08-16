@@ -2,6 +2,8 @@ package com.ledger.wallet.application.idempotency;
 
 import com.ledger.wallet.domain.model.IdempotencyRecord;
 import com.ledger.wallet.domain.model.IdempotencyStatus;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,20 +28,34 @@ public class IdempotencyService {
     private final Duration ttl;
     private final Duration maxWait;
     private final Duration pollInterval;
+    private final MeterRegistry meterRegistry;
 
     @Autowired
-    public IdempotencyService(IdempotencyRepository repository, IdempotencyProperties properties) {
-        this(repository, Duration.ofHours(properties.ttlHours()), DEFAULT_MAX_WAIT, DEFAULT_POLL_INTERVAL);
+    public IdempotencyService(IdempotencyRepository repository, IdempotencyProperties properties, MeterRegistry meterRegistry) {
+        this(repository, Duration.ofHours(properties.ttlHours()), DEFAULT_MAX_WAIT, DEFAULT_POLL_INTERVAL, meterRegistry);
     }
 
+    // Existing 4-arg test constructor kept intact so IdempotencyServiceTest's ~12 call sites don't
+    // need to change: it gets a fresh, real (not mocked) in-memory registry it never has to assert on.
     IdempotencyService(IdempotencyRepository repository, Duration ttl, Duration maxWait, Duration pollInterval) {
+        this(repository, ttl, maxWait, pollInterval, new SimpleMeterRegistry());
+    }
+
+    IdempotencyService(IdempotencyRepository repository, Duration ttl, Duration maxWait, Duration pollInterval, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.ttl = ttl;
         this.maxWait = maxWait;
         this.pollInterval = pollInterval;
+        this.meterRegistry = meterRegistry;
     }
 
     public IdempotencyResult begin(UUID userId, String key, String fingerprint) {
+        IdempotencyResult result = doBegin(userId, key, fingerprint);
+        recordHit(result);
+        return result;
+    }
+
+    private IdempotencyResult doBegin(UUID userId, String key, String fingerprint) {
         Optional<IdempotencyRecord> existing = repository.find(userId, key);
         if (existing.isEmpty()) {
             return attemptInsert(userId, key, fingerprint, InsertMode.FRESH);
@@ -59,6 +75,21 @@ public class IdempotencyService {
             case PENDING -> awaitCompletion(userId, key);
             case FAILED -> throw new IllegalStateException("unreachable: FAILED records are always stale");
         };
+    }
+
+    /** SPEC.md §7.3: wallet_idempotency_hits_total{result=new|replay|mismatch}. InProgress is not a
+     * "hit" against a cached response, so it's deliberately left uncounted. */
+    private void recordHit(IdempotencyResult result) {
+        String label = switch (result) {
+            case IdempotencyResult.New ignored -> "new";
+            case IdempotencyResult.Replay ignored -> "replay";
+            case IdempotencyResult.Mismatch ignored -> "mismatch";
+            case IdempotencyResult.InProgress ignored -> null;
+        };
+        if (label == null) {
+            return;
+        }
+        meterRegistry.counter("wallet_idempotency_hits_total", "result", label).increment();
     }
 
     public void complete(UUID userId, String key, int responseStatus, String responseBody) {

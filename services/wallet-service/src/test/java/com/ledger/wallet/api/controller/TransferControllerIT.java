@@ -4,8 +4,10 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.http.Fault;
 import com.ledger.wallet.support.BaseIntegrationTest;
 import com.ledger.wallet.support.JwtTestHelper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,6 +30,9 @@ class TransferControllerIT extends BaseIntegrationTest {
     static {
         LEDGER.start();
     }
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @DynamicPropertySource
     static void ledgerServiceUrl(DynamicPropertyRegistry registry) {
@@ -132,6 +137,11 @@ class TransferControllerIT extends BaseIntegrationTest {
                         .content(transferBody(source, destination, "999.00")))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.errors[0].code").value("IDEMPOTENCY_KEY_MISMATCH"));
+
+        assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "mismatch").count())
+                .isGreaterThanOrEqualTo(1.0);
+        assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "new").count())
+                .isGreaterThanOrEqualTo(1.0);
     }
 
     @Test
