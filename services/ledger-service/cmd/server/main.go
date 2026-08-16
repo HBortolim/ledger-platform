@@ -53,7 +53,7 @@ func main() {
 		producer.Close()
 	}()
 
-	postingRepo := repository.NewPostingRepository(pool, cfg.DailyTransferCap)
+	postingRepo := repository.NewPostingRepository(pool, cfg.DailyTransferCap, cfg.SystemAccountID)
 	postingSvc := service.NewPostingService(postingRepo)
 	postingHandler := handler.NewPostingHandler(postingSvc)
 

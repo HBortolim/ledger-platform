@@ -31,7 +31,7 @@ func TestOutboxWorker_PublishesToKafka(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 	debit, credit := uuid.New(), uuid.New()
 	seedAccountBalance(t, pool, debit, "200.00")
 	tx := newBalancedTransfer(debit, credit, "100.00")
@@ -120,7 +120,7 @@ func TestOutboxWorker_KafkaDown_RowsStayPending(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 	debit, credit := uuid.New(), uuid.New()
 	seedAccountBalance(t, pool, debit, "200.00")
 	tx := newBalancedTransfer(debit, credit, "50.00")
@@ -177,7 +177,7 @@ func TestOutboxWorker_RetentionSweep(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 	debit, credit := uuid.New(), uuid.New()
 	seedAccountBalance(t, pool, debit, "200.00")
 	tx := newBalancedTransfer(debit, credit, "25.00")

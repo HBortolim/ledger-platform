@@ -79,25 +79,27 @@ func TestNilIfEmpty(t *testing.T) {
 }
 
 func TestCheckAvailableBalance_Sufficient(t *testing.T) {
+	r := &PostingRepository{}
 	account := uuid.New()
 	entries := []domain.LedgerEntry{
 		{AccountID: account, EntryType: domain.Debit, Amount: mustMoney(t, "50.00")},
 	}
 	balances := map[uuid.UUID]decimal.Decimal{account: decimal.NewFromInt(100)}
 
-	if err := checkAvailableBalance(entries, balances); err != nil {
+	if err := r.checkAvailableBalance(entries, balances); err != nil {
 		t.Errorf("checkAvailableBalance() = %v, want nil", err)
 	}
 }
 
 func TestCheckAvailableBalance_Insufficient(t *testing.T) {
+	r := &PostingRepository{}
 	account := uuid.New()
 	entries := []domain.LedgerEntry{
 		{AccountID: account, EntryType: domain.Debit, Amount: mustMoney(t, "150.00")},
 	}
 	balances := map[uuid.UUID]decimal.Decimal{account: decimal.NewFromInt(100)}
 
-	err := checkAvailableBalance(entries, balances)
+	err := r.checkAvailableBalance(entries, balances)
 	var insufficient domain.ErrInsufficientFunds
 	if !errors.As(err, &insufficient) {
 		t.Fatalf("checkAvailableBalance() = %v, want ErrInsufficientFunds", err)
@@ -111,6 +113,7 @@ func TestCheckAvailableBalance_Insufficient(t *testing.T) {
 // before comparing against the cached balance — this is the exact
 // accumulation bug checkAvailableBalance exists to prevent.
 func TestCheckAvailableBalance_SumsMultipleDebitsAgainstSameAccount(t *testing.T) {
+	r := &PostingRepository{}
 	account := uuid.New()
 	entries := []domain.LedgerEntry{
 		{AccountID: account, EntryType: domain.Debit, Amount: mustMoney(t, "60.00")},
@@ -118,7 +121,7 @@ func TestCheckAvailableBalance_SumsMultipleDebitsAgainstSameAccount(t *testing.T
 	}
 	balances := map[uuid.UUID]decimal.Decimal{account: decimal.NewFromInt(100)}
 
-	err := checkAvailableBalance(entries, balances)
+	err := r.checkAvailableBalance(entries, balances)
 	var insufficient domain.ErrInsufficientFunds
 	if !errors.As(err, &insufficient) {
 		t.Fatalf("checkAvailableBalance() = %v, want ErrInsufficientFunds (60+60 > 100)", err)
@@ -126,13 +129,14 @@ func TestCheckAvailableBalance_SumsMultipleDebitsAgainstSameAccount(t *testing.T
 }
 
 func TestCheckAvailableBalance_CreditOnlyNeverChecked(t *testing.T) {
+	r := &PostingRepository{}
 	account := uuid.New()
 	entries := []domain.LedgerEntry{
 		{AccountID: account, EntryType: domain.Credit, Amount: mustMoney(t, "1000000.00")},
 	}
 	// No balance entry at all for this account — a credit-only entry list
 	// must never consult the balances map.
-	if err := checkAvailableBalance(entries, map[uuid.UUID]decimal.Decimal{}); err != nil {
+	if err := r.checkAvailableBalance(entries, map[uuid.UUID]decimal.Decimal{}); err != nil {
 		t.Errorf("checkAvailableBalance() = %v, want nil for credit-only entries", err)
 	}
 }

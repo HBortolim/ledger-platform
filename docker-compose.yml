@@ -110,6 +110,7 @@ services:
       DATABASE_URL: postgres://ledger_app:ledger_app@postgres:5432/ledger?sslmode=disable
       KAFKA_BROKERS: kafka:29092
       DAILY_TRANSFER_CAP: "100000.00"
+      SYSTEM_ACCOUNT_ID: "00000000-0000-0000-0000-000000000001"
     depends_on:
       postgres:
         condition: service_healthy

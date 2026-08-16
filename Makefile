@@ -1,4 +1,4 @@
-.PHONY: up down build test load clean lint fmt
+.PHONY: up down build test test-e2e load clean lint fmt
 
 up:
 	docker compose up --build -d
@@ -16,10 +16,14 @@ test:
 	cd services/ledger-service && go test ./...
 	cd services/projection-service && go test ./...
 
+test-e2e:
+	cd tests/e2e && go test -tags=e2e ./...
+
 lint:
 	$(MAKE) -C services/wallet-service lint
 	cd services/ledger-service && golangci-lint run ./...
 	cd services/projection-service && golangci-lint run ./...
+	cd tests/e2e && go vet -tags=e2e ./...
 
 fmt:
 	$(MAKE) -C services/wallet-service fmt

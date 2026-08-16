@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -13,6 +14,7 @@ type Config struct {
 	KafkaBrokers     []string
 	AppPort          string
 	DailyTransferCap decimal.Decimal
+	SystemAccountID  uuid.UUID
 }
 
 func Load() (*Config, error) {
@@ -40,10 +42,20 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid DAILY_TRANSFER_CAP %q: %w", capStr, err)
 	}
 
+	systemAccountIDStr := os.Getenv("SYSTEM_ACCOUNT_ID")
+	if systemAccountIDStr == "" {
+		systemAccountIDStr = "00000000-0000-0000-0000-000000000001"
+	}
+	systemAccountID, err := uuid.Parse(systemAccountIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SYSTEM_ACCOUNT_ID %q: %w", systemAccountIDStr, err)
+	}
+
 	return &Config{
 		DatabaseURL:      dbURL,
 		KafkaBrokers:     strings.Split(brokers, ","),
 		AppPort:          ":" + port,
 		DailyTransferCap: dailyCap,
+		SystemAccountID:  systemAccountID,
 	}, nil
 }

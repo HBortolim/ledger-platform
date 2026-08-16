@@ -275,6 +275,21 @@ class CreateTransferUseCaseTest {
     }
 
     @Test
+    void rejectedByLedgerWithDailyLimitExceeded_returns422AndCompletes() {
+        stubValidWallets();
+        UUID transactionId = UUID.randomUUID();
+        when(idempotencyService.begin(eq(userId), eq("key"), anyString())).thenReturn(new IdempotencyResult.New(transactionId));
+        when(ledgerClient.postPosting(any(), anyString(), any(), any()))
+                .thenReturn(new PostPostingResult.Rejected(DomainErrorCode.DAILY_LIMIT_EXCEEDED, "daily cap exceeded"));
+
+        TransferOutcome outcome = useCase.execute(request(sourceId, destinationId, "10.00"), "key", principal);
+
+        assertThat(outcome.httpStatus()).isEqualTo(422);
+        assertThat(outcome.body()).contains(DomainErrorCode.DAILY_LIMIT_EXCEEDED);
+        verify(idempotencyService).complete(userId, "key", 422, outcome.body());
+    }
+
+    @Test
     void ledgerUnavailable_marksIdempotencyFailedAndRethrows() {
         stubValidWallets();
         UUID transactionId = UUID.randomUUID();

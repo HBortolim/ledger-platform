@@ -1,5 +1,6 @@
 package com.ledger.wallet.application.idempotency;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledger.wallet.api.dto.CreateTransferRequest;
 import org.junit.jupiter.api.Test;
 
@@ -82,6 +83,29 @@ class RequestFingerprintTest {
 
         CreateTransferRequest a = new CreateTransferRequest(source, destination, new BigDecimal("100.00"), "rent");
         CreateTransferRequest b = new CreateTransferRequest(source, destination, new BigDecimal("100.00"), "rent (corrected memo)");
+
+        assertThat(RequestFingerprint.of(a)).isEqualTo(RequestFingerprint.of(b));
+    }
+
+    @Test
+    void fingerprint_stableAcrossFieldOrderAndWhitespaceInSourceJson() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        UUID source = UUID.randomUUID();
+        UUID destination = UUID.randomUUID();
+
+        String compactReordered = String.format(
+                "{\"amount\":100.00,\"destinationWalletId\":\"%s\",\"sourceWalletId\":\"%s\"}",
+                destination, source);
+        String whitespaced = String.format("""
+                {
+                  "sourceWalletId" :   "%s"  ,
+                  "destinationWalletId":"%s",
+                  "amount": 100.00
+                }
+                """, source, destination);
+
+        CreateTransferRequest a = mapper.readValue(compactReordered, CreateTransferRequest.class);
+        CreateTransferRequest b = mapper.readValue(whitespaced, CreateTransferRequest.class);
 
         assertThat(RequestFingerprint.of(a)).isEqualTo(RequestFingerprint.of(b));
     }

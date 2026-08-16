@@ -20,12 +20,13 @@ import (
 const pgErrUniqueViolation = "23505"
 
 type PostingRepository struct {
-	pool     *pgxpool.Pool
-	dailyCap decimal.Decimal
+	pool            *pgxpool.Pool
+	dailyCap        decimal.Decimal
+	systemAccountID uuid.UUID
 }
 
-func NewPostingRepository(pool *pgxpool.Pool, dailyCap decimal.Decimal) *PostingRepository {
-	return &PostingRepository{pool: pool, dailyCap: dailyCap}
+func NewPostingRepository(pool *pgxpool.Pool, dailyCap decimal.Decimal, systemAccountID uuid.UUID) *PostingRepository {
+	return &PostingRepository{pool: pool, dailyCap: dailyCap, systemAccountID: systemAccountID}
 }
 
 // Post atomically writes a LedgerTransaction: entries, locked-balance update, and outbox row.
@@ -48,7 +49,7 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 	}
 
 	// Step 3: Available-balance check — cached balance minus total debit must be non-negative.
-	if err := checkAvailableBalance(tx.Entries, lockedBalances); err != nil {
+	if err := r.checkAvailableBalance(tx.Entries, lockedBalances); err != nil {
 		return err
 	}
 
@@ -226,7 +227,14 @@ func lockAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUI
 	return balances, nil
 }
 
-func checkAvailableBalance(entries []domain.LedgerEntry, balances map[uuid.UUID]decimal.Decimal) error {
+// checkAvailableBalance rejects any debit that would overdraw its account,
+// except the configured system funding account: per NFR-CONS-5, its balance
+// is definitionally the negative mirror of all money in circulation, so it
+// must be allowed to go negative (ADR-0008). The exemption matches on this
+// one configured UUID only — never on "account absent from
+// account_balances_locked", since every account auto-provisions at 0 on
+// first touch and every wallet must keep failing overdrafts.
+func (r *PostingRepository) checkAvailableBalance(entries []domain.LedgerEntry, balances map[uuid.UUID]decimal.Decimal) error {
 	totalDebit := make(map[uuid.UUID]decimal.Decimal)
 	for _, e := range entries {
 		if e.EntryType == domain.Debit {
@@ -234,6 +242,9 @@ func checkAvailableBalance(entries []domain.LedgerEntry, balances map[uuid.UUID]
 		}
 	}
 	for accountID, debitAmt := range totalDebit {
+		if accountID == r.systemAccountID {
+			continue
+		}
 		if balances[accountID].LessThan(debitAmt) {
 			return domain.ErrInsufficientFunds{AccountID: accountID}
 		}

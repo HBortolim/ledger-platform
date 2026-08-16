@@ -29,7 +29,7 @@ func TestPostingRepository(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 
 	t.Run("BalancedTransaction/PersistsEntriesAndOutbox", func(t *testing.T) {
 		debit, credit := uuid.New(), uuid.New()
@@ -169,7 +169,7 @@ func TestPostingRepository(t *testing.T) {
 	t.Run("DailyCapExceeded/ReturnsTypedError", func(t *testing.T) {
 		// Own repo instance with a tight cap — the outer repo uses testDailyCap
 		// (generously high) so this subtest's cap doesn't leak into the others.
-		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"))
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"), systemFundingAccountID)
 
 		debit, credit := uuid.New(), uuid.New()
 		seedAccountBalance(t, pool, debit, "10000.00") // plenty of balance headroom; only the cap should trigger
@@ -204,6 +204,52 @@ func TestPostingRepository(t *testing.T) {
 		}
 		if debitBalance != "9940.00" {
 			t.Errorf("debit balance = %s, want 9940.00 (only the first, successful 60.00 debit applied)", debitBalance)
+		}
+	})
+
+	t.Run("SystemAccountOverdraft/DepositEntersMoneyThroughAPI", func(t *testing.T) {
+		wallet := uuid.New()
+		// System account is seeded at 1000.00 by migration 0002; debit well past
+		// that to prove the exemption, not just headroom within the seed value.
+		deposit := newBalancedTransfer(systemFundingAccountID, wallet, "1500.00")
+		if err := repo.Post(ctx, deposit); err != nil {
+			t.Fatalf("deposit Post() = error %v, want nil (system account must be exempt from the overdraft check)", err)
+		}
+
+		var systemBalance string
+		if err := pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", systemFundingAccountID).Scan(&systemBalance); err != nil {
+			t.Fatalf("query system account balance: %v", err)
+		}
+		if systemBalance != "-500.00" {
+			t.Errorf("system account balance = %s, want -500.00 (1000.00 seed - 1500.00 debit, negative per NFR-CONS-5)", systemBalance)
+		}
+
+		var walletBalance string
+		if err := pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", wallet).Scan(&walletBalance); err != nil {
+			t.Fatalf("query wallet balance: %v", err)
+		}
+		if walletBalance != "1500.00" {
+			t.Errorf("wallet balance = %s, want 1500.00", walletBalance)
+		}
+
+		// The credited wallet can now fund a normal wallet-to-wallet transfer.
+		destination := uuid.New()
+		transfer := newBalancedTransfer(wallet, destination, "200.00")
+		if err := repo.Post(ctx, transfer); err != nil {
+			t.Fatalf("follow-up transfer Post() = error %v, want nil", err)
+		}
+	})
+
+	t.Run("SystemAccountOverdraft/ExemptionIsExactlyOneAccountWide", func(t *testing.T) {
+		zeroBalanceWallet, destination := uuid.New(), uuid.New()
+		// zeroBalanceWallet is auto-provisioned at 0 on first touch -- not seeded.
+
+		tx := newBalancedTransfer(zeroBalanceWallet, destination, "1.00")
+		err := repo.Post(ctx, tx)
+
+		var insufficient domain.ErrInsufficientFunds
+		if !errors.As(err, &insufficient) {
+			t.Fatalf("Post() = %v, want ErrInsufficientFunds (only the system account is exempt)", err)
 		}
 	})
 
