@@ -121,17 +121,12 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 		return
 	}
 
-	applied, skipped, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
+	result, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
 	if err != nil {
 		log.Printf("projection consumer: apply transaction %s failed, will retry: %v", event.TransactionID, err)
 		return
 	}
-	for range applied {
-		metrics.EventsProcessedTotal.WithLabelValues("applied").Inc()
-	}
-	for range skipped {
-		metrics.EventsProcessedTotal.WithLabelValues("skipped").Inc()
-	}
+	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
 
 	lag := max(time.Since(event.OccurredAt).Seconds(), 0)
 	metrics.LagSeconds.Observe(lag)

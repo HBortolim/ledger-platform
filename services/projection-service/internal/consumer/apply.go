@@ -66,33 +66,40 @@ func upsertOffset(ctx context.Context, tx pgx.Tx, group, topic string, partition
 
 // applyEvent applies every entry in event within one DB transaction, records
 // the consumer's last-processed offset in the same transaction, and commits.
-// applied/skipped count entries, not events: a redelivered two-entry
-// transfer reports skipped=2, applied=0.
-func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent, group, topic string, partition int32, offset int64) (applied, skipped int, err error) {
+// The whole event is classified as a single outcome, "applied" or "skipped" —
+// matching the granularity of metrics.EventsProcessedTotal's "error" label,
+// which is already per-message (a poison message has no entries to count).
+// Because every entry in one event commits together in this one transaction,
+// an event is never partially applied across delivery attempts: on first
+// delivery every entry is newly applied ("applied"); on redelivery every
+// entry was already applied by the prior commit ("skipped").
+func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent, group, topic string, partition int32, offset int64) (result string, err error) {
 	dbtx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return 0, 0, fmt.Errorf("begin tx: %w", err)
+		return "", fmt.Errorf("begin tx: %w", err)
 	}
 	defer dbtx.Rollback(ctx) //nolint:errcheck
 
+	anyApplied := false
 	for _, e := range event.Entries {
 		ok, err := applyEntry(ctx, dbtx, e.AccountID, e.EntryID, signedDelta(e.EntryType, e.Amount))
 		if err != nil {
-			return 0, 0, err
+			return "", err
 		}
 		if ok {
-			applied++
-		} else {
-			skipped++
+			anyApplied = true
 		}
 	}
 
 	if err := upsertOffset(ctx, dbtx, group, topic, partition, offset); err != nil {
-		return 0, 0, err
+		return "", err
 	}
 
 	if err := dbtx.Commit(ctx); err != nil {
-		return 0, 0, fmt.Errorf("commit projection apply: %w", err)
+		return "", fmt.Errorf("commit projection apply: %w", err)
 	}
-	return applied, skipped, nil
+	if anyApplied {
+		return "applied", nil
+	}
+	return "skipped", nil
 }

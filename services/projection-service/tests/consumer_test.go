@@ -103,8 +103,12 @@ func TestConsumer_DuplicateDelivery_IsNoOp(t *testing.T) {
 	}
 	t.Cleanup(second.Close)
 	tickUntil(t, second, func() bool {
-		return testutil.ToFloat64(metrics.EventsProcessedTotal.WithLabelValues("skipped")) >= skippedBefore+2
+		return testutil.ToFloat64(metrics.EventsProcessedTotal.WithLabelValues("skipped")) >= skippedBefore+1
 	})
+
+	if got := testutil.ToFloat64(metrics.EventsProcessedTotal.WithLabelValues("skipped")); got != skippedBefore+1 {
+		t.Errorf("EventsProcessedTotal{result=skipped} after one redelivered 2-entry event = %v, want exactly %v (one increment per event, not per entry)", got, skippedBefore+1)
+	}
 
 	if got := walletBalance(t, pool, debitWallet); got != "-50.00" {
 		t.Errorf("debit wallet balance after redelivery = %s, want -50.00 (must not double-apply)", got)
