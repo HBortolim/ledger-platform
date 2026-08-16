@@ -22,8 +22,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
     public static final String AUTHORIZATION_HEADER = "Authorization";
 
+    // "/error" must be public: Spring Boot's internal forward from sendError() re-enters the
+    // security filter chain as its own ERROR-dispatch request, and without this, that forward
+    // is denied as unauthenticated and overwrites the original 401/403 with an empty-body 403.
     public static final Set<String> PUBLIC_PATHS = Set.of(
-            "/health/live", "/health/ready", "/metrics", "/actuator/prometheus"
+            "/health/live", "/health/ready", "/metrics", "/actuator/prometheus", "/error"
     );
 
     private static final WebAuthenticationDetailsSource DETAILS_SOURCE =
