@@ -31,6 +31,9 @@ replay_pid*
 # Claude Code AI
 .claude/
 
+# superpowers subagent-driven-development scratch workspace
+.superpowers/
+
 # JWT private key — never commit
 keys/private.pem
 
