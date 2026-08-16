@@ -29,7 +29,7 @@ func TestPostingConcurrency(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 
 	t.Run("ConcurrentDebitsSameAccount/ExactlyOneSucceeds", func(t *testing.T) {
 		source := uuid.New()
@@ -74,7 +74,7 @@ func TestPostingConcurrency(t *testing.T) {
 		// Direct proof that moving the cap check inside the locked transaction
 		// (ADR-0011) closes the TOCTOU race: plenty of *balance* headroom, but a
 		// tight daily cap that only one of the two concurrent transfers fits under.
-		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"))
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"), systemFundingAccountID)
 
 		source := uuid.New()
 		destA, destB := uuid.New(), uuid.New()
