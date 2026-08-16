@@ -2,6 +2,13 @@ package com.ledger.wallet.api.controller;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.http.Fault;
+import com.ledger.wallet.api.dto.CreateTransferRequest;
+import com.ledger.wallet.application.idempotency.IdempotencyKeys;
+import com.ledger.wallet.application.idempotency.IdempotencyRepository;
+import com.ledger.wallet.application.idempotency.RequestFingerprint;
+import com.ledger.wallet.domain.model.IdempotencyRecord;
+import com.ledger.wallet.domain.model.IdempotencyStatus;
+import com.ledger.wallet.infrastructure.idempotency.IdempotencyJanitor;
 import com.ledger.wallet.support.BaseIntegrationTest;
 import com.ledger.wallet.support.JwtTestHelper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -12,9 +19,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +44,12 @@ class TransferControllerIT extends BaseIntegrationTest {
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @Autowired
+    private IdempotencyRepository idempotencyRepository;
+
+    @Autowired
+    private IdempotencyJanitor idempotencyJanitor;
 
     @DynamicPropertySource
     static void ledgerServiceUrl(DynamicPropertyRegistry registry) {
@@ -142,6 +159,75 @@ class TransferControllerIT extends BaseIntegrationTest {
                 .isGreaterThanOrEqualTo(1.0);
         assertThat(meterRegistry.counter("wallet_idempotency_hits_total", "result", "new").count())
                 .isGreaterThanOrEqualTo(1.0);
+    }
+
+    @Test
+    void pendingKeyNeverCompleted_returns409ThenBecomesReusableAfterSweep() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String source = createWallet(userId);
+        String destination = createWallet(UUID.randomUUID());
+        String key = UUID.randomUUID().toString();
+
+        CreateTransferRequest req = new CreateTransferRequest(
+                UUID.fromString(source), UUID.fromString(destination), new BigDecimal("100.00"), null);
+        String fingerprint = RequestFingerprint.of(req);
+        // Deliberately stale (> IdempotencyJanitor's 60s PENDING_TIMEOUT) so the
+        // sweep below actually flips this row -- PENDING itself is never "stale"
+        // to IdempotencyService.begin, regardless of age; only the janitor cares.
+        Instant longAgo = Instant.now().minus(2, ChronoUnit.HOURS);
+        idempotencyRepository.insertPending(new IdempotencyRecord(
+                key, userId, fingerprint, IdempotencyStatus.PENDING, null, null, longAgo, longAgo.plus(24, ChronoUnit.HOURS)));
+
+        // No WireMock stub for GET /admin/ledger/transactions/{id}: the unmatched
+        // request 404s by default, which recoverFromInProgress correctly treats as
+        // "nothing to recover" -> TransferInProgressException -> 409.
+        mockMvc.perform(post("/transfers")
+                        .header("Authorization", "Bearer " + JwtTestHelper.tokenFor(userId))
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(transferBody(source, destination, "100.00")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IN_PROGRESS"));
+
+        idempotencyJanitor.sweep();
+        stubPosted(UUID.randomUUID().toString());
+
+        mockMvc.perform(post("/transfers")
+                        .header("Authorization", "Bearer " + JwtTestHelper.tokenFor(userId))
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(transferBody(source, destination, "100.00")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void pendingKeyAlreadyPostedByLedger_recoversAndReturns201() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String source = createWallet(userId);
+        String destination = createWallet(UUID.randomUUID());
+        String key = UUID.randomUUID().toString();
+
+        CreateTransferRequest req = new CreateTransferRequest(
+                UUID.fromString(source), UUID.fromString(destination), new BigDecimal("100.00"), null);
+        String fingerprint = RequestFingerprint.of(req);
+        Instant now = Instant.now();
+        idempotencyRepository.insertPending(new IdempotencyRecord(
+                key, userId, fingerprint, IdempotencyStatus.PENDING, null, null, now, now.plus(24, ChronoUnit.HOURS)));
+
+        UUID transactionId = IdempotencyKeys.transactionId(userId, key);
+        LEDGER.stubFor(get(urlEqualTo("/admin/ledger/transactions/" + transactionId))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"transactionId":"%s","type":"TRANSFER","postedAt":"2026-05-19T14:23:00.123Z","entries":[]}
+                                """.formatted(transactionId))));
+
+        mockMvc.perform(post("/transfers")
+                        .header("Authorization", "Bearer " + JwtTestHelper.tokenFor(userId))
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(transferBody(source, destination, "100.00")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.transferId").value(transactionId.toString()));
     }
 
     @Test
