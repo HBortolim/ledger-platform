@@ -6,11 +6,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// EventsProcessedTotal counts entries applied by the LEDGER_POSTED consumer,
-// per SPEC.md §7.3. result is one of: applied, skipped, error.
+// EventsProcessedTotal counts LEDGER_POSTED events processed by the
+// consumer, per SPEC.md §7.3. result is one of: applied, skipped, error.
+// One increment per Kafka event, not per ledger entry within it — see
+// apply.go's applyEvent for why that's the correct unit.
 var EventsProcessedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "projection_events_processed_total",
-	Help: "Total ledger entries processed by the projection consumer, labeled by outcome.",
+	Help: "Total LEDGER_POSTED events processed by the projection consumer, labeled by outcome.",
 }, []string{"result"})
 
 // LagSeconds observes projection lag (now - event.occurredAt) at apply time,

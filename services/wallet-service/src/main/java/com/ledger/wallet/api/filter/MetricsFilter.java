@@ -18,6 +18,17 @@ import java.util.concurrent.TimeUnit;
  * servlet filter (default order), so it wraps the dispatch to the controller and observes the
  * final response status set by GlobalExceptionHandler — but runs after the Spring Security chain
  * (JwtAuthFilter), so a request rejected there never reaches this filter.
+ *
+ * <p>This means {@code wallet_requests_total} can never carry a {@code status="401"} (or other
+ * security-rejection) observation. That gap is an accepted tradeoff, not an oversight: reordering
+ * this filter ahead of Spring Security would be a behavior change requiring new test coverage, and
+ * the gap is already mitigated by Micrometer's default HTTP metrics (kept per this task's Global
+ * Constraints). Spring Boot registers its {@code ServerHttpObservationFilter} — the producer of
+ * {@code http.server.requests} / {@code http_server_requests_seconds} — at {@code
+ * Ordered.HIGHEST_PRECEDENCE + 1} (see {@code WebMvcObservationAutoConfiguration}), which runs
+ * outside and before Spring Security's chain ({@code SecurityProperties.DEFAULT_FILTER_ORDER =
+ * -100}). So auth rejections, including 401s from {@code JwtAuthFilter}, remain observable via
+ * {@code http_server_requests_seconds} even though they never reach {@code wallet_requests_total}.
  */
 @Component
 public class MetricsFilter extends OncePerRequestFilter {
