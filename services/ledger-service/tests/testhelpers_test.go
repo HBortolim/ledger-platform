@@ -82,6 +82,87 @@ func setupLedgerDB(t *testing.T) (ownerDSN, appDSN string) {
 	return ownerDSN, appDSN
 }
 
+// setupLedgerDBHighConcurrency is setupLedgerDB with a higher Postgres
+// max_connections, for tests that hold 100+ simultaneous connections open
+// (one per in-flight PostingRepository.Post call). The default
+// max_connections=100 isn't enough headroom once the harness's own
+// migration connection and Postgres's reserved superuser slots are
+// subtracted — hitting that ceiling produces a flaky "sorry, too many
+// clients already" failure that looks like, but isn't, the race the test
+// exists to catch.
+func setupLedgerDBHighConcurrency(t *testing.T) (ownerDSN, appDSN string) {
+	t.Helper()
+
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		t.Fatalf("could not connect to docker: %v", err)
+	}
+
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
+		Repository: "postgres",
+		Tag:        "16-alpine",
+		Env: []string{
+			"POSTGRES_USER=ledger",
+			"POSTGRES_PASSWORD=ledger",
+			"POSTGRES_DB=ledger",
+		},
+		Cmd: []string{"postgres", "-c", "max_connections=300"},
+	})
+	if err != nil {
+		t.Fatalf("could not start postgres container: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := pool.Purge(resource); err != nil {
+			t.Logf("could not purge postgres container: %v", err)
+		}
+	})
+
+	hostPort := resource.GetPort("5432/tcp")
+	ownerDSN = fmt.Sprintf("postgres://ledger:ledger@localhost:%s/ledger?sslmode=disable", hostPort)
+	appDSN = fmt.Sprintf("postgres://ledger_app:ledger_app@localhost:%s/ledger?sslmode=disable", hostPort)
+
+	ctx := context.Background()
+	if err := pool.Retry(func() error {
+		conn, err := pgx.Connect(ctx, ownerDSN)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = conn.Close(ctx) }()
+		return conn.Ping(ctx)
+	}); err != nil {
+		t.Fatalf("postgres never became ready: %v", err)
+	}
+
+	m, err := migrate.New("file://../migrations", ownerDSN+"&x-migrations-table=ledger_schema_migrations")
+	if err != nil {
+		t.Fatalf("could not init migrate: %v", err)
+	}
+	if err := m.Up(); err != nil {
+		t.Fatalf("migrations failed to apply: %v", err)
+	}
+
+	return ownerDSN, appDSN
+}
+
+// newHighConcurrencyPool opens a pgxpool sized for 100+ simultaneous
+// PostingRepository.Post calls against a setupLedgerDBHighConcurrency database.
+func newHighConcurrencyPool(t *testing.T, appDSN string) *pgxpool.Pool {
+	t.Helper()
+
+	cfg, err := pgxpool.ParseConfig(appDSN)
+	if err != nil {
+		t.Fatalf("pgxpool.ParseConfig() = error %v, want nil", err)
+	}
+	cfg.MaxConns = 150
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("pgxpool.NewWithConfig() = error %v, want nil", err)
+	}
+	t.Cleanup(pool.Close)
+	return pool
+}
+
 // setupKafka spins an ephemeral single-node KRaft Kafka broker via dockertest
 // and returns its host-reachable bootstrap address. KRaft's advertised
 // listener must be known at container boot, so this binds a fixed host port
