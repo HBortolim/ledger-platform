@@ -1,6 +1,6 @@
 # Task 01 — Money conservation tests (TST-CONCURRENCY-1, -2)
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Ledger Service
 **Depends on:** nothing new — builds on M2 Task 03's `PostingRepository` and M2 Task 07's `posting_concurrency_test.go`
 **Blocks:** Task 04
@@ -106,8 +106,8 @@ func newHighConcurrencyPool(t *testing.T, appDSN string) *pgxpool.Pool {
 }
 ```
 
-- [ ] Add both functions to `testhelpers_test.go`, alongside the existing `setupLedgerDB`.
-- [ ] Run `cd services/ledger-service && go build ./tests/...` — expect it to compile (no test uses the new helpers yet).
+- [x] Add both functions to `testhelpers_test.go`, alongside the existing `setupLedgerDB`.
+- [x] Run `cd services/ledger-service && go build ./tests/...` — expect it to compile (no test uses the new helpers yet).
 
 ## Step 2: TST-CONCURRENCY-1 — money cannot be created, at scale
 
@@ -199,8 +199,8 @@ func TestMoneyCannotBeCreated_100ConcurrentTransfers(t *testing.T) {
 }
 ```
 
-- [ ] Run: `cd services/ledger-service && go test ./tests/... -run TestMoneyCannotBeCreated_100ConcurrentTransfers -v -timeout 300s`
-- [ ] Expected: `PASS`, all 50 iterations. Confirm the log shows a plausible mix of successes/failures per iteration (not all-succeed or all-fail, which would mean the lock isn't actually serializing anything).
+- [x] Run: `cd services/ledger-service && go test ./tests/... -run TestMoneyCannotBeCreated_100ConcurrentTransfers -v -timeout 300s`
+- [x] Expected: `PASS`, all 50 iterations. Confirm the log shows a plausible mix of successes/failures per iteration (not all-succeed or all-fail, which would mean the lock isn't actually serializing anything).
 
 ## Step 3: TST-CONCURRENCY-2 — money cannot be destroyed
 
@@ -278,13 +278,13 @@ func queryLockedBalance(t *testing.T, ctx context.Context, pool *pgxpool.Pool, a
 
 Add `"github.com/jackc/pgx/v5/pgxpool"` to the file's imports for `queryLockedBalance`'s signature.
 
-- [ ] Run: `cd services/ledger-service && go test ./tests/... -run TestMoneyCannotBeDestroyed_100ConcurrentTransfers -v -timeout 60s`
-- [ ] Expected: `PASS`.
+- [x] Run: `cd services/ledger-service && go test ./tests/... -run TestMoneyCannotBeDestroyed_100ConcurrentTransfers -v -timeout 60s`
+- [x] Expected: `PASS`.
 
 ## Step 4: Run both together, then commit
 
-- [ ] Run: `cd services/ledger-service && go test ./... -timeout 300s` — confirm nothing else regressed (existing `posting_concurrency_test.go` smoke tests still pass alongside the new scale tests).
-- [ ] Commit:
+- [x] Run: `cd services/ledger-service && go test ./... -timeout 300s` — confirm nothing else regressed (existing `posting_concurrency_test.go` smoke tests still pass alongside the new scale tests).
+- [x] Commit:
 
 ```bash
 git add services/ledger-service/tests/testhelpers_test.go services/ledger-service/tests/posting_concurrency_scale_test.go

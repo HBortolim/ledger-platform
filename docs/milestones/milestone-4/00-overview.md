@@ -90,5 +90,10 @@ cd services/wallet-service
 cd ../..
 
 # 3. Full project test suite still green end to end
-make test
+# `make test` is currently broken at the repo root (services/wallet-service/Makefile is
+# missing — a pre-existing gap, out of scope for this milestone; see Task 04's Implementation
+# Record). These are the direct commands Task 04 verified work in its place:
+cd services/ledger-service && go test ./...
+cd ../projection-service && go test ./...
+cd ../wallet-service && ./mvnw verify
 ```

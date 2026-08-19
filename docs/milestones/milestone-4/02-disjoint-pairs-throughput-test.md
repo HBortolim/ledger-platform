@@ -163,12 +163,8 @@ git commit -m "test: add TST-CONCURRENCY-3, disjoint wallet pairs don't block ea
 - Warm-up step added (concurrent 50-transfer batch matching fanOut) to establish baseline query planning and connection pooling costs
 - Without warm-up, database cold-start overhead on Phase 1 (disjoint) masked the serialization benefit in Phase 2 (shared)
 - With warm-up, T' (shared-source serialized) reliably > 2xT (disjoint parallel), proving per-account locking scope
-- Typical measured ratio: 2.5x–3.5x (well above conservative 2x threshold)
 
-**Measured T/T' (representative run after warm-up):**
-- T (disjoint, 50 concurrent parallel transfers): ~85-115ms
-- T' (shared source, 50 serialized transfers): ~180-250ms
-- Ratio T'/T: ~2.3x (exceeds 2x requirement)
+**Measured T/T' ratio:** Task 04's independent 100-iteration stability pass (see `docs/milestones/milestone-4/04-stability-verification-and-signoff.md`'s Implementation Record) is the authoritative measurement: the ratio ranged **2.45x–4.33x** across 100 runs, always comfortably above the 2x threshold asserted by the test. (An earlier "representative run" figure recorded here did not reproduce reliably and has been removed in favor of this 100-run measurement.)
 
 **Files changed:**
 - `services/ledger-service/tests/posting_throughput_test.go` (new file, 103 lines)

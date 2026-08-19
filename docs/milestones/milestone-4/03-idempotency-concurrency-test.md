@@ -1,6 +1,6 @@
 # Task 03 — Idempotency under concurrency (TST-CONCURRENCY-4)
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Wallet Service
 **Depends on:** nothing new — builds on M3 Task 04's `IdempotencyService` and M3 Task 05's `TransferController`
 **Blocks:** Task 04
@@ -166,19 +166,19 @@ class TransferIdempotencyConcurrencyIT extends BaseIntegrationTest {
 
 Note: `createWallet(token, ownerId)` takes an explicit `token` parameter (unlike `TransferControllerIT`'s version, which always derives it from `ownerId`) because both wallets in this test must be created and owned correctly while only `userId`'s token is used for the transfer itself — `destination`'s owner is a different random UUID than the caller.
 
-- [ ] Run: `cd services/wallet-service && ./mvnw verify -Dit.test=TransferIdempotencyConcurrencyIT -DfailIfNoTests=true`. **Not** `./mvnw test` — the project's `maven-failsafe-plugin` (which picks up `*IT.java`) is bound to the `integration-test`/`verify` lifecycle phases, not `test`, and takes `-Dit.test`, not Surefire's `-Dtest`. Running `./mvnw test -Dtest=...` against an `*IT.java` class silently runs zero tests and reports success — exactly the false-positive this milestone exists to catch, so get this command right.
-- [ ] Expected: `PASS`, `Tests run: 1`. If it fails with wallet-not-found or 403 errors instead of the intended race behavior, double check the `@Transactional(propagation = Propagation.NOT_SUPPORTED)` annotation is present on the test method — that's the symptom of the trap described above. If it reports `Tests run: 0`, the command above was wrong (see the note on `-Dit.test` vs `-Dtest`) — a 0-test "pass" is not a pass.
+- [x] Run: `cd services/wallet-service && ./mvnw verify -Dit.test=TransferIdempotencyConcurrencyIT -DfailIfNoTests=true`. **Not** `./mvnw test` — the project's `maven-failsafe-plugin` (which picks up `*IT.java`) is bound to the `integration-test`/`verify` lifecycle phases, not `test`, and takes `-Dit.test`, not Surefire's `-Dtest`. Running `./mvnw test -Dtest=...` against an `*IT.java` class silently runs zero tests and reports success — exactly the false-positive this milestone exists to catch, so get this command right.
+- [x] Expected: `PASS`, `Tests run: 1`. If it fails with wallet-not-found or 403 errors instead of the intended race behavior, double check the `@Transactional(propagation = Propagation.NOT_SUPPORTED)` annotation is present on the test method — that's the symptom of the trap described above. If it reports `Tests run: 0`, the command above was wrong (see the note on `-Dit.test` vs `-Dtest`) — a 0-test "pass" is not a pass.
 
 ## Step 2: Confirm it actually exercises the race (not just the happy path)
 
 A test that never hits `DuplicateKeyException` in `IdempotencyService.attemptInsert` isn't proving anything about concurrency — it would pass identically if `/transfers` were single-threaded. Temporarily add a log line (or run with `-Dit.test=TransferIdempotencyConcurrencyIT -Dspring-boot.run.arguments=--logging.level.com.ledger.wallet=DEBUG`) and confirm in the output that `awaitCompletion` is actually invoked — i.e., that more than one thread reached `attemptInsert` before any of them completed. Remove any temporary logging before committing.
 
-- [ ] Confirm via logs or a temporary counter that at least one of the 20 requests took the `DuplicateKeyException → awaitCompletion` path, not just the `New` path.
+- [x] Confirm via logs or a temporary counter that at least one of the 20 requests took the `DuplicateKeyException → awaitCompletion` path, not just the `New` path.
 
 ## Step 3: Run alongside the rest of the wallet-service suite, then commit
 
-- [ ] Run: `cd services/wallet-service && ./mvnw verify` — confirm no regressions and no test-ordering flakiness introduced by the non-transactional test (it commits real rows; other tests use random UUIDs per M3's existing convention, so this should be safe). `verify` runs the full unit + integration suite, unlike plain `test`.
-- [ ] Commit:
+- [x] Run: `cd services/wallet-service && ./mvnw verify` — confirm no regressions and no test-ordering flakiness introduced by the non-transactional test (it commits real rows; other tests use random UUIDs per M3's existing convention, so this should be safe). `verify` runs the full unit + integration suite, unlike plain `test`.
+- [x] Commit:
 
 ```bash
 git add services/wallet-service/src/test/java/com/ledger/wallet/api/controller/TransferIdempotencyConcurrencyIT.java
