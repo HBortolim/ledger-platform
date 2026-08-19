@@ -1,6 +1,6 @@
 # Milestone 4 — Concurrency Correctness
 
-**Status:** Ready to start
+**Status:** Complete
 **Owner:** Ledger Service (Tasks 01–02) + Wallet Service (Task 03) + cross-service sign-off (Task 04)
 **Spec reference:** [`SPEC.md` §11 — Milestone 4](../../SPEC.md), AC-5.17/5.18 (concurrency ACs), §9.4 (the canonical race), §10.4 (TST-CONCURRENCY-1..4), ADR-002 (locking strategy)
 **Estimated effort:** 4 days (per roadmap) — reduced in practice; see below
@@ -64,12 +64,12 @@ No new ADRs are required to *start* this milestone — Task 04 documents the exc
 
 ## Definition of done (milestone)
 
-- [ ] TST-CONCURRENCY-1: 50 iterations of 100 concurrent transfers from an under-funded wallet; every iteration has `successes × amount ≤ initial balance`, no unhandled errors (Task 01).
-- [ ] TST-CONCURRENCY-2: 100 concurrent transfers between two wallets; `Σ(source_initial − source_final) == Σ(dest_final − dest_initial)` (Task 01).
-- [ ] TST-CONCURRENCY-3: 50 concurrent transfers across 50 disjoint wallet pairs complete in time `T`; 50 concurrent transfers from one shared source complete in `T' > 2×T` (Task 02).
-- [ ] TST-CONCURRENCY-4: the same `Idempotency-Key` submitted 20 times in parallel produces exactly one ledger transaction and 20 byte-identical responses (Task 03).
-- [ ] The full suite (Tasks 01–03) passes 100 consecutive runs with zero flakes; any bug it found along the way is fixed and re-verified (Task 04).
-- [ ] `SPEC.md` §11 Milestone 4 checklist and the roadmap's "Demonstrable" line can be checked off honestly.
+- [x] TST-CONCURRENCY-1: 50 iterations of 100 concurrent transfers from an under-funded wallet; every iteration has `successes × amount ≤ initial balance`, no unhandled errors (Task 01).
+- [x] TST-CONCURRENCY-2: 100 concurrent transfers between two wallets; `Σ(source_initial − source_final) == Σ(dest_final − dest_initial)` (Task 01).
+- [x] TST-CONCURRENCY-3: 50 concurrent transfers across 50 disjoint wallet pairs complete in time `T`; 50 concurrent transfers from one shared source complete in `T' > 2×T` (Task 02).
+- [x] TST-CONCURRENCY-4: the same `Idempotency-Key` submitted 20 times in parallel produces exactly one ledger transaction and 20 byte-identical responses (Task 03).
+- [x] The full suite (Tasks 01–03) passes 100 consecutive runs with zero flakes; any bug it found along the way is fixed and re-verified (Task 04). **Verified 2026-08-18: ledger-service 300/300 sub-tests (100 iterations × 3 tests, 0 failures, ~19.8 min); wallet-service 100/100 iterations (0 failures, ~33 min). No bugs found, so nothing needed fixing. See Task 04's Implementation Record for full detail.**
+- [x] `SPEC.md` §11 Milestone 4 checklist and the roadmap's "Demonstrable" line can be checked off honestly. **Confirmed honest: the concurrency test suite passes 100 iterations green, as measured above.**
 
 ---
 
