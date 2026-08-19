@@ -64,6 +64,24 @@ func TestMoneyCannotBeCreated_100ConcurrentTransfers(t *testing.T) {
 			}
 		}
 
+		failures := concurrency - successes
+		t.Logf("iteration %d: successes=%d failures=%d", iter, successes, failures)
+
+		// With a correct lock, the winner count is deterministic: exactly
+		// initial/perTransfer = 500.00/10.00 = 50 of the 100 concurrent
+		// transfers can succeed. Fewer than 50 means spurious rejections
+		// (contention wrongly rejecting requests that should have won);
+		// more than 50 means money was created that the initial balance
+		// didn't cover. This is a stronger check than the spent<=initial
+		// bound below: it catches a regression that miscounts successes in
+		// a way the spent/balance checks (which are derived from
+		// successes itself) would not.
+		const wantSuccesses = 50
+		if successes != wantSuccesses {
+			t.Fatalf("iteration %d: successes = %d, want exactly %d (500.00/10.00) — fewer means spurious rejections under contention, more means money was created from nothing",
+				iter, successes, wantSuccesses)
+		}
+
 		spent := perTransferAmount.Mul(decimal.NewFromInt(int64(successes)))
 		if spent.GreaterThan(initial) {
 			t.Fatalf("iteration %d: %d successes spent %s, want <= initial balance %s (money created from nothing)",

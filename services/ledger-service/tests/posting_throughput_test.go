@@ -19,6 +19,10 @@ import (
 // this test asserts T' is meaningfully larger, proving the lock is scoped
 // to the contended account, not the whole ledger.
 func TestDisjointPairsDontBlock(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timing-sensitive; skipped in -short mode — see docs/milestones/milestone-4/02-disjoint-pairs-throughput-test.md")
+	}
+
 	_, appDSN := setupLedgerDBHighConcurrency(t)
 	pool := newHighConcurrencyPool(t, appDSN)
 	ctx := context.Background()

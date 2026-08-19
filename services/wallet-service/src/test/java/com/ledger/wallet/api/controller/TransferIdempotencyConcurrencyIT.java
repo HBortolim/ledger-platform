@@ -54,8 +54,8 @@ class TransferIdempotencyConcurrencyIT extends BaseIntegrationTest {
         UUID userId = UUID.randomUUID();
         String token = JwtTestHelper.tokenFor(userId);
 
-        String source = createWallet(token, userId);
-        String destination = createWallet(token, UUID.randomUUID());
+        String source = createWallet(userId);
+        String destination = createWallet(UUID.randomUUID());
         String key = UUID.randomUUID().toString();
         String requestBody = """
                 {"sourceWalletId":"%s","destinationWalletId":"%s","amount":"25.00","description":"race"}
@@ -79,29 +79,29 @@ class TransferIdempotencyConcurrencyIT extends BaseIntegrationTest {
         // would remove the manual Future bookkeeping below too, but as of this project's JDK it
         // isn't confirmed finalized and the build doesn't pass --enable-preview anywhere; not
         // worth a build-wide toggle for one test.
-        ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
         CountDownLatch startGate = new CountDownLatch(1);
-
-        List<Callable<MvcResult>> tasks = java.util.stream.IntStream.range(0, concurrency)
-                .<Callable<MvcResult>>mapToObj(i -> () -> {
-                    startGate.await();
-                    return mockMvc.perform(post("/transfers")
-                                    .header("Authorization", "Bearer " + token)
-                                    .header("Idempotency-Key", key)
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(requestBody))
-                            .andReturn();
-                })
-                .collect(Collectors.toList());
-
-        List<Future<MvcResult>> futures = tasks.stream().map(pool::submit).collect(Collectors.toList());
-        startGate.countDown();
-
         List<MvcResult> results = new java.util.ArrayList<>();
-        for (Future<MvcResult> future : futures) {
-            results.add(future.get(15, TimeUnit.SECONDS));
+
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Callable<MvcResult>> tasks = java.util.stream.IntStream.range(0, concurrency)
+                    .<Callable<MvcResult>>mapToObj(i -> () -> {
+                        startGate.await();
+                        return mockMvc.perform(post("/transfers")
+                                        .header("Authorization", "Bearer " + token)
+                                        .header("Idempotency-Key", key)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(requestBody))
+                                .andReturn();
+                    })
+                    .collect(Collectors.toList());
+
+            List<Future<MvcResult>> futures = tasks.stream().map(pool::submit).collect(Collectors.toList());
+            startGate.countDown();
+
+            for (Future<MvcResult> future : futures) {
+                results.add(future.get(15, TimeUnit.SECONDS));
+            }
         }
-        pool.shutdown();
 
         for (MvcResult result : results) {
             assertThat(result.getResponse().getStatus())
@@ -126,9 +126,9 @@ class TransferIdempotencyConcurrencyIT extends BaseIntegrationTest {
         LEDGER.verify(1, postRequestedFor(urlEqualTo("/ledger/postings")));
     }
 
-    private String createWallet(String token, UUID ownerId) throws Exception {
+    private String createWallet(UUID ownerId) throws Exception {
         String body = mockMvc.perform(post("/wallets")
-                        .header("Authorization", "Bearer " + token)
+                        .header("Authorization", "Bearer " + JwtTestHelper.tokenFor(ownerId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currency\":\"BRL\"}"))
                 .andExpect(status().isCreated())
