@@ -28,10 +28,13 @@ func TestDisjointPairsDontBlock(t *testing.T) {
 	const fanOut = 50
 	const amount = "1.00"
 
-	// Warm-up: pay connection/plan-cache costs once by running a disjoint
-	// batch matching the fanOut, outside both timed phases, to establish
-	// baseline query planning and connection pooling costs for concurrent
-	// workload.
+	// Warm-up: pay connection/plan-cache costs once by running a disjoint batch
+	// matching the fanOut (not just a single transfer). Initial testing showed
+	// that a single-transfer warm-up was insufficient: Phase 1 (disjoint) paid
+	// database cold-start overhead while Phase 2 (shared) benefited from that
+	// warmth, causing the shared (serialized) phase to appear faster than the
+	// disjoint (parallel) phase, masking the serialization effect. A full 50-
+	// concurrent-transfer warm-up primes the query planner and connection pool.
 	warmupPairs := make([][2]uuid.UUID, fanOut)
 	for i := range warmupPairs {
 		src, dst := uuid.New(), uuid.New()
