@@ -27,7 +27,7 @@ func TestDisjointPairsDontBlock(t *testing.T) {
 	pool := newHighConcurrencyPool(t, appDSN)
 	ctx := context.Background()
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 
 	const fanOut = 50
 	const amount = "1.00"

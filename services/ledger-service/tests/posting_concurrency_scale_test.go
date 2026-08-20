@@ -24,7 +24,7 @@ func TestMoneyCannotBeCreated_100ConcurrentTransfers(t *testing.T) {
 	pool := newHighConcurrencyPool(t, appDSN)
 	ctx := context.Background()
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 
 	const (
 		iterations     = 50
@@ -110,7 +110,7 @@ func TestMoneyCannotBeDestroyed_100ConcurrentTransfers(t *testing.T) {
 	pool := newHighConcurrencyPool(t, appDSN)
 	ctx := context.Background()
 
-	repo := repository.NewPostingRepository(pool, testDailyCap)
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
 
 	const (
 		concurrency = 100
