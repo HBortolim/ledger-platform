@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHandler) {
@@ -15,12 +16,18 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHa
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	v1 := r.Group("/ledger")
+	// Tracing is scoped to the business endpoints. Health and metrics are
+	// polled continuously by infrastructure and are not worth spans; scoping
+	// by route group avoids depending on otelgin's filter-option API, which
+	// has moved between versions.
+	traced := r.Group("", otelgin.Middleware("ledger-service"))
+
+	v1 := traced.Group("/ledger")
 	{
 		v1.POST("/postings", postingHandler.PostPosting)
 	}
 
-	admin := r.Group("/admin")
+	admin := traced.Group("/admin")
 	{
 		admin.GET("/ledger/transactions/:id", postingHandler.GetTransaction)
 	}

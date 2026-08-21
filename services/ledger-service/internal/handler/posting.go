@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -104,6 +105,13 @@ func (h *PostingHandler) PostPosting(c *gin.Context) {
 		h.renderPostError(c, err)
 		return
 	}
+
+	// Request-scoped: carries the active span's trace_id/span_id via
+	// logging.traceHandler (Task 02), giving NFR-OBS-1 log correlation a
+	// real log line to correlate on the request's happy path.
+	slog.InfoContext(c.Request.Context(), "posting created",
+		slog.String("transaction_id", tx.ID.String()),
+		slog.String("type", string(tx.Type)))
 
 	c.JSON(http.StatusCreated, renderPosting(tx))
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ledger-platform/ledger-service/internal/config"
 	"github.com/ledger-platform/ledger-service/internal/handler"
 	"github.com/ledger-platform/ledger-service/internal/logging"
+	"github.com/ledger-platform/ledger-service/internal/observability"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
 	"github.com/ledger-platform/ledger-service/internal/repository"
 	"github.com/ledger-platform/ledger-service/internal/service"
@@ -27,6 +28,21 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdownTracing, err := observability.SetupTracing(ctx, "ledger-service")
+	if err != nil {
+		slog.Error("cannot initialise tracing", slog.Any("error", err))
+		os.Exit(1)
+	}
+	defer func() {
+		// Fresh context: ctx is already cancelled by the time this runs, and
+		// a cancelled context would abort the flush this exists to perform.
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer flushCancel()
+		if err := shutdownTracing(flushCtx); err != nil {
+			slog.Error("tracing shutdown error", slog.Any("error", err))
+		}
+	}()
 
 	cfg, err := config.Load()
 	if err != nil {
