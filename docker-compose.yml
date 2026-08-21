@@ -89,7 +89,7 @@ services:
       FLYWAY_DATASOURCE_PASSWORD: ledger
       LEDGER_SERVICE_URL: http://ledger-service:8081
       JWT_PUBLIC_KEY_PATH: /keys/public.pem
-      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
     volumes:
       - ./keys:/keys:ro

@@ -33,6 +33,32 @@ management:
     export:
       prometheus:
         enabled: true
+  tracing:
+    sampling:
+      # Always-on: a demo that drops the reviewer's one transfer is worthless
+      # (milestone-5 overview, Global Constraints). Production would use a
+      # parent-based ratio sampler.
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  # Deliberately no management.opentelemetry.tracing.export.otlp.endpoint key here.
+  #
+  # Deviation from the milestone-5 brief: the brief's property,
+  # management.otlp.tracing.endpoint, is deprecated at "error" level in Spring
+  # Boot 4.0.6 (replacement: management.opentelemetry.tracing.export.otlp.endpoint)
+  # and silently does not bind -- with it, tests passed but no exporter was ever
+  # configured, so nothing was actually sent to the collector.
+  #
+  # Switching to the real property with a "${VAR:}" empty-string default doesn't
+  # work either: OtlpTracingConfigurations.ConnectionDetails guards exporter
+  # creation with @ConditionalOnProperty("...otlp.endpoint"), which (with no
+  # havingValue) only checks the property is *present*, not that it's non-blank
+  # -- so an empty string still activates OtlpHttpSpanExporter, which then throws
+  # ("Invalid endpoint, must start with http:// or https://") on the blank value.
+  #
+  # Omitting the key entirely relies on Spring Boot's relaxed environment-variable
+  # binding: docker-compose's MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+  # binds straight to management.opentelemetry.tracing.export.otlp.endpoint with no
+  # YAML entry needed, so the property is genuinely absent (not empty) outside
+  # compose -- matching the "no connection errors with no endpoint set" requirement.
   otlp:
     metrics:
       export:
@@ -52,8 +78,3 @@ ledger:
 
 jwt:
   public-key-path: ${JWT_PUBLIC_KEY_PATH:keys/public.pem}
-
-otel:
-  exporter:
-    otlp:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}

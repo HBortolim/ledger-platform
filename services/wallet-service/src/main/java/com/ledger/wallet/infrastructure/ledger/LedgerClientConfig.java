@@ -16,16 +16,35 @@ public class LedgerClientConfig {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
+    /**
+     * Built from the auto-configured {@link RestClient.Builder} bean rather than the
+     * {@code RestClient.builder()} static factory: only the bean carries Spring's
+     * observation instrumentation, which is what injects the W3C {@code traceparent}
+     * header on the outbound call. Building from the static factory produces a client
+     * that works perfectly but emits no client span and propagates no trace context --
+     * splitting what NFR-OBS-5 requires to be one end-to-end trace into two.
+     */
     @Bean
-    public RestClient ledgerRestClient(LedgerServiceProperties props) {
-        return buildRestClient(props.url(), CONNECT_TIMEOUT, READ_TIMEOUT);
+    public RestClient ledgerRestClient(RestClient.Builder builder, LedgerServiceProperties props) {
+        return builder
+                .baseUrl(props.url())
+                .requestFactory(jdkRequestFactory(CONNECT_TIMEOUT, READ_TIMEOUT))
+                .build();
     }
 
     /**
-     * Package-visible so tests can build a client against a WireMock server
-     * with short timeouts, without duplicating the request-factory wiring.
+     * Package-visible so tests can build a client against a WireMock server with short
+     * timeouts, without duplicating the request-factory wiring. Tests do not need -- and
+     * should not depend on -- observation instrumentation, so the static factory is correct here.
      */
-     static RestClient buildRestClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+    static RestClient buildRestClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(jdkRequestFactory(connectTimeout, readTimeout))
+                .build();
+    }
+
+    private static JdkClientHttpRequestFactory jdkRequestFactory(Duration connectTimeout, Duration readTimeout) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(connectTimeout)
                 // The Ledger Service (Go/Gin's net/http) speaks plain HTTP/1.1 only.
@@ -35,10 +54,6 @@ public class LedgerClientConfig {
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(readTimeout);
-
-        return RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(requestFactory)
-                .build();
+        return requestFactory;
     }
 }

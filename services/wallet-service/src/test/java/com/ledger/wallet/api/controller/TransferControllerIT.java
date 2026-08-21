@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -322,6 +323,27 @@ class TransferControllerIT extends BaseIntegrationTest {
                         .content(transferBody(source, destination, "10.00")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().string("Retry-After", "2"));
+    }
+
+    @Test
+    void outboundLedgerCall_carriesW3CTraceparentHeader() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String source = createWallet(userId);
+        String destination = createWallet(UUID.randomUUID());
+        stubPosted("55555555-5555-5555-5555-555555555555");
+
+        mockMvc.perform(post("/transfers")
+                        .header("Authorization", "Bearer " + JwtTestHelper.tokenFor(userId))
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(transferBody(source, destination, "100.00")))
+                .andExpect(status().isCreated());
+
+        // NFR-OBS-2: W3C traceparent, format 00-<32 hex trace>-<16 hex span>-<2 hex flags>.
+        // Guards the RestClient.builder() trap: the static factory produces an
+        // uninstrumented client that sends no traceparent at all.
+        LEDGER.verify(postRequestedFor(urlEqualTo("/ledger/postings"))
+                .withHeader("traceparent", matching("^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")));
     }
 
     @Test
