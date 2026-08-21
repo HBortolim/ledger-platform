@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,12 +47,12 @@ func (w *Worker) Run(ctx context.Context) error {
 			return nil
 		case <-pollTicker.C:
 			if err := w.Poll(ctx); err != nil {
-				log.Printf("outbox poll error: %v", err)
+				slog.ErrorContext(ctx, "outbox poll failed", slog.Any("error", err))
 			}
 			w.reportDepth(ctx)
 		case <-retentionTicker.C:
 			if err := w.Sweep(ctx); err != nil {
-				log.Printf("outbox retention sweep error: %v", err)
+				slog.ErrorContext(ctx, "outbox retention sweep failed", slog.Any("error", err))
 			}
 		}
 	}
@@ -109,7 +109,8 @@ func (w *Worker) Poll(ctx context.Context) error {
 		hdrs, err := decodeHeaders(r.headers)
 		if err != nil {
 			metrics.OutboxPublishFailures.WithLabelValues("serialization").Inc()
-			log.Printf("outbox row %d: decode headers: %v", r.id, err)
+			slog.ErrorContext(ctx, "outbox row: decode headers failed",
+				slog.Int64("outbox_id", r.id), slog.Any("error", err))
 			continue
 		}
 		records = append(records, &kgo.Record{
@@ -137,7 +138,8 @@ func (w *Worker) Poll(ctx context.Context) error {
 	for i, res := range results {
 		if res.Err != nil {
 			metrics.OutboxPublishFailures.WithLabelValues(classifyProduceErr(res.Err)).Inc()
-			log.Printf("outbox row %d: produce failed: %v", produced[i].id, res.Err)
+			slog.ErrorContext(ctx, "outbox row: produce failed",
+				slog.Int64("outbox_id", produced[i].id), slog.Any("error", res.Err))
 			continue
 		}
 		published = append(published, produced[i].id)
@@ -166,7 +168,7 @@ func (w *Worker) Sweep(ctx context.Context) error {
 		return fmt.Errorf("outbox retention sweep: %w", err)
 	}
 	if n := tag.RowsAffected(); n > 0 {
-		log.Printf("outbox retention sweep: deleted %d rows", n)
+		slog.InfoContext(ctx, "outbox retention sweep completed", slog.Int64("deleted_rows", n))
 	}
 	return nil
 }
@@ -177,7 +179,7 @@ func (w *Worker) reportDepth(ctx context.Context) {
 		`SELECT count(*) FROM ledger_db.outbox WHERE published_at IS NULL`,
 	).Scan(&depth)
 	if err != nil {
-		log.Printf("outbox depth query error: %v", err)
+		slog.ErrorContext(ctx, "outbox depth query failed", slog.Any("error", err))
 		return
 	}
 	metrics.OutboxDepth.Set(depth)

@@ -2,7 +2,8 @@ package consumer
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"strconv"
 	"time"
 
@@ -68,11 +69,12 @@ func (c *LedgerPostedConsumer) Close() {
 // cancelled.
 func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 	if err := c.Connect(); err != nil {
-		log.Fatalf("projection consumer: cannot create kafka client: %v", err)
+		slog.ErrorContext(ctx, "projection consumer: cannot create kafka client", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer c.Close()
 
-	log.Println("projection consumer started")
+	slog.InfoContext(ctx, "projection consumer started")
 	for {
 		select {
 		case <-ctx.Done():
@@ -80,7 +82,7 @@ func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 		default:
 		}
 		if err := c.Tick(ctx); err != nil {
-			log.Printf("projection consumer: tick error: %v", err)
+			slog.ErrorContext(ctx, "projection consumer: tick failed", slog.Any("error", err))
 		}
 	}
 }
@@ -96,7 +98,8 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 	}
 
 	fetches.EachError(func(topic string, partition int32, err error) {
-		log.Printf("projection consumer: fetch error topic=%s partition=%d: %v", topic, partition, err)
+		slog.ErrorContext(ctx, "projection consumer: fetch error",
+			slog.String("topic", topic), slog.Int("partition", int(partition)), slog.Any("error", err))
 	})
 
 	fetches.EachRecord(func(r *kgo.Record) {
@@ -113,17 +116,23 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 	event, err := decodeLedgerPostedEvent(r.Value)
 	if err != nil {
-		log.Printf("projection consumer: poison message at %s[%d]@%d: %v", r.Topic, r.Partition, r.Offset, err)
+		slog.ErrorContext(ctx, "projection consumer: poison message",
+			slog.String("topic", r.Topic),
+			slog.Int("partition", int(r.Partition)),
+			slog.Int64("offset", r.Offset),
+			slog.Any("error", err))
 		metrics.EventsProcessedTotal.WithLabelValues("error").Inc()
 		if err := c.client.CommitRecords(ctx, r); err != nil {
-			log.Printf("projection consumer: commit past poison message: %v", err)
+			slog.ErrorContext(ctx, "projection consumer: commit past poison message failed", slog.Any("error", err))
 		}
 		return
 	}
 
 	result, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
 	if err != nil {
-		log.Printf("projection consumer: apply transaction %s failed, will retry: %v", event.TransactionID, err)
+		slog.ErrorContext(ctx, "projection consumer: apply failed, will retry",
+			slog.String("transaction_id", event.TransactionID.String()),
+			slog.Any("error", err))
 		return
 	}
 	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
@@ -136,7 +145,9 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 	// (notification-service is optional and unbuilt per SPEC.md §5.2).
 
 	if err := c.client.CommitRecords(ctx, r); err != nil {
-		log.Printf("projection consumer: commit offset for %s: %v", event.TransactionID, err)
+		slog.ErrorContext(ctx, "projection consumer: commit offset failed",
+			slog.String("transaction_id", event.TransactionID.String()),
+			slog.Any("error", err))
 		return
 	}
 
