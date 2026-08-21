@@ -10,8 +10,11 @@ processors:
   batch:
 
 exporters:
-  jaeger:
-    endpoint: jaeger:14250
+  # Jaeger 1.35+ ingests OTLP natively. The Collector's dedicated `jaeger`
+  # exporter was deprecated in 2023 and removed well before the 0.101.0 image
+  # pinned in docker-compose.observability.yml — see ADR-0012.
+  otlp/jaeger:
+    endpoint: jaeger:4317
     tls:
       insecure: true
   prometheus:
@@ -22,7 +25,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [jaeger]
+      exporters: [otlp/jaeger]
     metrics:
       receivers: [otlp]
       processors: [batch]

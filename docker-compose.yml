@@ -89,6 +89,8 @@ services:
       FLYWAY_DATASOURCE_PASSWORD: ledger
       LEDGER_SERVICE_URL: http://ledger-service:8081
       JWT_PUBLIC_KEY_PATH: /keys/public.pem
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
     volumes:
       - ./keys:/keys:ro
     depends_on:
@@ -111,6 +113,7 @@ services:
       KAFKA_BROKERS: kafka:29092
       DAILY_TRANSFER_CAP: "100000.00"
       SYSTEM_ACCOUNT_ID: "00000000-0000-0000-0000-000000000001"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -134,6 +137,7 @@ services:
       DATABASE_URL: postgres://projection_app:projection_app@postgres:5432/ledger?sslmode=disable
       KAFKA_BROKERS: kafka:29092
       KAFKA_GROUP_ID: projection-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     depends_on:
       postgres:
         condition: service_healthy

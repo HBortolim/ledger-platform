@@ -1,17 +1,17 @@
-version: "3.9"
-
 services:
   jaeger:
     image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
     ports:
+      # UI only. OTLP ingest happens over the compose network from the
+      # collector, so 4317/4318 deliberately are not published to the host.
       - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
 
   prometheus:
     image: prom/prometheus:v2.52.0
     volumes:
-      - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
 
@@ -20,7 +20,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
-      - ./infrastructure/observability/grafana:/etc/grafana/provisioning
+      - ./infrastructure/observability/grafana:/etc/grafana/provisioning:ro
     ports:
       - "3000:3000"
     depends_on:
@@ -28,10 +28,10 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.101.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./infrastructure/observability/otel-collector.yml:/etc/otelcol-contrib/config.yaml
+      - ./infrastructure/observability/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "8888:8888"
+      - "8889:8889"   # prometheus exporter scrape target
     depends_on:
       - jaeger
-      - prometheus
