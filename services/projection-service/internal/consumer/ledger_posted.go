@@ -181,6 +181,10 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 		span.SetStatus(codes.Error, "apply failed")
 		return
 	}
+	slog.InfoContext(ctx, "projection consumer: apply succeeded",
+		slog.String("transaction_id", event.TransactionID.String()),
+		slog.String("result", result),
+		slog.Int64("offset", r.Offset))
 	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
 
 	lag := max(time.Since(event.OccurredAt).Seconds(), 0)
