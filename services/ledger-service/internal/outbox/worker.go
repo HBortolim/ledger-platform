@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ledger-platform/ledger-service/internal/metrics"
 )
@@ -20,6 +24,8 @@ const (
 	batchSize         = 100
 	produceTimeout    = 5 * time.Second
 )
+
+var tracer = otel.Tracer("github.com/ledger-platform/ledger-service/internal/outbox")
 
 // Worker drains ledger_db.outbox rows to Kafka: exactly-once from the
 // database's perspective, at-least-once from the consumer's.
@@ -105,6 +111,7 @@ func (w *Worker) Poll(ctx context.Context) error {
 
 	records := make([]*kgo.Record, 0, len(batch))
 	produced := make([]outboxRow, 0, len(batch))
+	spans := make([]trace.Span, 0, len(batch))
 	for _, r := range batch {
 		hdrs, err := decodeHeaders(r.headers)
 		if err != nil {
@@ -113,6 +120,19 @@ func (w *Worker) Poll(ctx context.Context) error {
 				slog.Int64("outbox_id", r.id), slog.Any("error", err))
 			continue
 		}
+
+		// Continue the trace that produced this row rather than starting a
+		// new one: the publish is logically part of that posting, even though
+		// it runs on this worker's goroutine much later.
+		rowCtx := otel.GetTextMapPropagator().Extract(ctx, headerCarrier(hdrs))
+		_, span := tracer.Start(rowCtx, "outbox publish",
+			trace.WithSpanKind(trace.SpanKindProducer),
+			trace.WithAttributes(
+				attribute.String("messaging.system", "kafka"),
+				attribute.String("messaging.destination.name", r.topic),
+				attribute.Int64("outbox.row_id", r.id),
+			))
+
 		records = append(records, &kgo.Record{
 			Topic:   r.topic,
 			Key:     []byte(r.key),
@@ -120,6 +140,7 @@ func (w *Worker) Poll(ctx context.Context) error {
 			Headers: hdrs,
 		})
 		produced = append(produced, r)
+		spans = append(spans, span)
 	}
 
 	if len(records) == 0 {
@@ -140,8 +161,12 @@ func (w *Worker) Poll(ctx context.Context) error {
 			metrics.OutboxPublishFailures.WithLabelValues(classifyProduceErr(res.Err)).Inc()
 			slog.ErrorContext(ctx, "outbox row: produce failed",
 				slog.Int64("outbox_id", produced[i].id), slog.Any("error", res.Err))
+			spans[i].RecordError(res.Err)
+			spans[i].SetStatus(codes.Error, "produce failed")
+			spans[i].End()
 			continue
 		}
+		spans[i].End()
 		published = append(published, produced[i].id)
 	}
 

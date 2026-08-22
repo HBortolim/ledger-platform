@@ -21,3 +21,28 @@ func decodeHeaders(raw []byte) ([]kgo.RecordHeader, error) {
 	}
 	return hdrs, nil
 }
+
+// headerCarrier adapts a franz-go record header slice to OTel's
+// TextMapCarrier so W3C trace context can be read back out of a row's stored
+// headers. Extract-only: Set is intentionally a no-op, since nothing here
+// ever writes context back into an already-persisted row.
+type headerCarrier []kgo.RecordHeader
+
+func (c headerCarrier) Get(key string) string {
+	for _, h := range c {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c headerCarrier) Set(string, string) {}
+
+func (c headerCarrier) Keys() []string {
+	keys := make([]string, len(c))
+	for i, h := range c {
+		keys[i] = h.Key
+	}
+	return keys
+}

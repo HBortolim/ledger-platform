@@ -9,6 +9,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/consumer"
@@ -28,7 +32,7 @@ func TestConsumer_AppliesLedgerPosted_ToWalletBalances(t *testing.T) {
 	produceLedgerPosted(t, bootstrap, txID, time.Now().UTC(), []entryFixture{
 		{EntryID: uuid.New(), AccountID: debitWallet, EntryType: "DEBIT", Amount: "100.00"},
 		{EntryID: uuid.New(), AccountID: creditWallet, EntryType: "CREDIT", Amount: "100.00"},
-	})
+	}, "")
 
 	c := consumer.NewLedgerPostedConsumer(pool, &config.Config{
 		KafkaBrokers: []string{bootstrap},
@@ -76,7 +80,7 @@ func TestConsumer_DuplicateDelivery_IsNoOp(t *testing.T) {
 	produceLedgerPosted(t, bootstrap, txID, time.Now().UTC(), []entryFixture{
 		{EntryID: uuid.New(), AccountID: debitWallet, EntryType: "DEBIT", Amount: "50.00"},
 		{EntryID: uuid.New(), AccountID: creditWallet, EntryType: "CREDIT", Amount: "50.00"},
-	})
+	}, "")
 
 	first := consumer.NewLedgerPostedConsumer(pool, &config.Config{
 		KafkaBrokers: []string{bootstrap}, KafkaGroupID: "dup-test-first",
@@ -146,7 +150,7 @@ func TestConsumer_PoisonMessage_CountsAndContinues(t *testing.T) {
 	wallet := uuid.New()
 	produceLedgerPosted(t, bootstrap, uuid.New(), time.Now().UTC(), []entryFixture{
 		{EntryID: uuid.New(), AccountID: wallet, EntryType: "CREDIT", Amount: "10.00"},
-	})
+	}, "")
 
 	errorsBefore := testutil.ToFloat64(metrics.EventsProcessedTotal.WithLabelValues("error"))
 
@@ -164,6 +168,75 @@ func TestConsumer_PoisonMessage_CountsAndContinues(t *testing.T) {
 
 	if got := testutil.ToFloat64(metrics.EventsProcessedTotal.WithLabelValues("error")); got < errorsBefore+1 {
 		t.Errorf("EventsProcessedTotal{result=error} = %v, want >= %v (poison message counted)", got, errorsBefore+1)
+	}
+}
+
+// TestConsumerJoinsProducerTrace proves the Kafka hop preserves trace context
+// (NFR-OBS-2): a record whose header carries a traceparent must be applied
+// inside a span belonging to that same trace, not a fresh root trace. This is
+// what makes NFR-OBS-5's end-to-end view possible.
+func TestConsumerJoinsProducerTrace(t *testing.T) {
+	// Reuse this package's existing harness exactly as
+	// TestConsumer_AppliesLedgerPosted_ToWalletBalances does (Postgres +
+	// Kafka containers, migrations, a connected consumer). Do not stand up a
+	// second set of containers.
+	_, appDSN := setupProjectionDB(t)
+	bootstrap := setupKafka(t)
+	pool := connectPool(t, appDSN)
+
+	recorder := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithSpanProcessor(recorder),
+	)
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	const traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	const wantTraceID = "4bf92f3577b34da6a3ce929d0e0e4736"
+
+	wallet := uuid.New()
+	entries := []entryFixture{
+		{EntryID: uuid.New(), AccountID: wallet, EntryType: "CREDIT", Amount: "10.00"},
+	}
+
+	// Produce via the helper extended above, passing the traceparent as the
+	// final argument.
+	produceLedgerPosted(t, bootstrap, uuid.New(), time.Now().UTC(), entries, traceparent)
+
+	c := consumer.NewLedgerPostedConsumer(pool, &config.Config{
+		KafkaBrokers: []string{bootstrap},
+		KafkaGroupID: "trace-join-test-group",
+	})
+	if err := c.Connect(); err != nil {
+		t.Fatalf("Connect() = error %v, want nil", err)
+	}
+	t.Cleanup(c.Close)
+
+	// Drive exactly one Tick, as the sibling tests in this file do, rather
+	// than racing the async Run loop.
+	if err := c.Tick(context.Background()); err != nil {
+		t.Fatalf("Tick() = error %v, want nil", err)
+	}
+
+	spans := recorder.Ended()
+	if len(spans) == 0 {
+		t.Fatal("no spans recorded; the consumer created none for the applied record")
+	}
+	var applySpan sdktrace.ReadOnlySpan
+	for _, s := range spans {
+		if s.Name() == "projection apply" {
+			applySpan = s
+			break
+		}
+	}
+	if applySpan == nil {
+		t.Fatalf("no %q span recorded; got %d spans", "projection apply", len(spans))
+	}
+	if got := applySpan.SpanContext().TraceID().String(); got != wantTraceID {
+		t.Errorf("apply span trace ID = %s, want %s (the consumer started a new trace "+
+			"instead of continuing the producer's)", got, wantTraceID)
 	}
 }
 

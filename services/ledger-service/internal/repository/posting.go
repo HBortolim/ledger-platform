@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/shopspring/decimal"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const pgErrUniqueViolation = "23505"
@@ -359,7 +361,9 @@ type ledgerPostedPayload struct {
 	TransactionID   uuid.UUID      `json:"transactionId"`
 	TransactionType string         `json:"transactionType"`
 	Entries         []entryPayload `json:"entries"`
-	Traceparent     string         `json:"traceparent"` // wired in M5; placeholder for now
+	// Mirror of the Kafka traceparent header; the header is authoritative
+	// for propagation (ADR-0013). Empty when tracing is disabled.
+	Traceparent string `json:"traceparent"`
 }
 
 type entryPayload struct {
@@ -370,6 +374,14 @@ type entryPayload struct {
 }
 
 func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction) error {
+	// Capture the active trace context into the row. The worker publishes
+	// this asynchronously -- a tick later at best, after a Kafka outage at
+	// worst -- so there is no ambient context to read at publish time; it has
+	// to travel with the row. Empty when tracing is disabled, which is the
+	// pre-M5 behaviour and remains valid (ADR-0013).
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
 	eps := make([]entryPayload, len(t.Entries))
 	for i, e := range t.Entries {
 		eps[i] = entryPayload{
@@ -387,13 +399,16 @@ func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction)
 		TransactionID:   t.ID,
 		TransactionType: string(t.Type),
 		Entries:         eps,
-		Traceparent:     "",
+		// Mirrors the header for human debuggability and §7.3 schema
+		// conformance. The header is authoritative for propagation --
+		// consumers MUST prefer it (ADR-0013).
+		Traceparent: carrier["traceparent"],
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal outbox payload: %w", err)
 	}
-	headersJSON, err := json.Marshal(map[string]string{"traceparent": ""})
+	headersJSON, err := json.Marshal(map[string]string(carrier))
 	if err != nil {
 		return fmt.Errorf("marshal outbox headers: %w", err)
 	}

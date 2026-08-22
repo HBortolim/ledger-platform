@@ -10,12 +10,41 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/metrics"
 )
 
 const ledgerPostedTopic = "ledger.posted.v1"
+
+var tracer = otel.Tracer("github.com/ledger-platform/projection-service/internal/consumer")
+
+// recordCarrier adapts a consumed record's headers to OTel's TextMapCarrier.
+// Extract-only; Set is a no-op.
+type recordCarrier []kgo.RecordHeader
+
+func (c recordCarrier) Get(key string) string {
+	for _, h := range c {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c recordCarrier) Set(string, string) {}
+
+func (c recordCarrier) Keys() []string {
+	keys := make([]string, len(c))
+	for i, h := range c {
+		keys[i] = h.Key
+	}
+	return keys
+}
 
 // LedgerPostedConsumer drains ledger.posted.v1 into projection_db.wallet_balances.
 // Kafka offsets are committed only after the corresponding DB transaction
@@ -114,6 +143,19 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 // database being down) leaves the offset uncommitted so the record is
 // redelivered on the next tick (§9.9).
 func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
+	// Continue the ledger's trace. The Kafka header is authoritative; the
+	// payload's traceparent field is a mirror for debugging only (ADR-0013).
+	// This is the hop that makes NFR-OBS-5's single end-to-end trace possible.
+	ctx = otel.GetTextMapPropagator().Extract(ctx, recordCarrier(r.Headers))
+	ctx, span := tracer.Start(ctx, "projection apply",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.source.name", r.Topic),
+			attribute.Int64("messaging.kafka.message.offset", r.Offset),
+		))
+	defer span.End()
+
 	event, err := decodeLedgerPostedEvent(r.Value)
 	if err != nil {
 		slog.ErrorContext(ctx, "projection consumer: poison message",
@@ -121,6 +163,8 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 			slog.Int("partition", int(r.Partition)),
 			slog.Int64("offset", r.Offset),
 			slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "poison message")
 		metrics.EventsProcessedTotal.WithLabelValues("error").Inc()
 		if err := c.client.CommitRecords(ctx, r); err != nil {
 			slog.ErrorContext(ctx, "projection consumer: commit past poison message failed", slog.Any("error", err))
@@ -133,6 +177,8 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 		slog.ErrorContext(ctx, "projection consumer: apply failed, will retry",
 			slog.String("transaction_id", event.TransactionID.String()),
 			slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "apply failed")
 		return
 	}
 	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
