@@ -102,7 +102,7 @@ Also update the struct comment at line 362, which now describes something that h
 
 Add the imports `go.opentelemetry.io/otel` and `go.opentelemetry.io/otel/propagation`.
 
-Note the graceful degradation: with no active span, `Inject` writes nothing, the carrier stays empty, and the row gets `{}` headers and `""` traceparent — byte-identical to today's behavior, so every existing outbox and E2E test keeps passing unchanged.
+Note the graceful degradation: with no active span, `Inject` writes nothing, the carrier stays empty, and the row gets `{}` headers and `""` traceparent — behaviorally equivalent to today's behavior (both mean "no trace context"), though not byte-identical: today's code writes `json.Marshal(map[string]string{"traceparent": ""})` → `{"traceparent":""}` (one empty-valued header), while the empty `propagation.MapCarrier{}` marshals to `{}` (zero headers). No consumer distinguishes the two, so every existing outbox and E2E test keeps passing unchanged.
 
 - [x] Make the edits.
 - [x] Run: `cd services/ledger-service && go build ./...`

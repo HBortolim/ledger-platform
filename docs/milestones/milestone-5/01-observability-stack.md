@@ -147,7 +147,7 @@ Add to the `environment:` block of **`wallet-service`** (Spring's OTLP exporter 
       MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
 ```
 
-These are set unconditionally in `docker-compose.yml` even though the collector only exists in the observability overlay. That is intentional and safe: with no collector running, the exporters fail to connect, log at debug, and drop spans — the services themselves keep working (overview decision #3). Task 03 and Task 04 implement the code that reads these.
+These are set unconditionally in `docker-compose.yml` even though the collector only exists in the observability overlay. That is intentional and safe: with no collector running, the exporters fail to connect and drop spans; for the Go services, that failure is routed through `otel.SetErrorHandler` into the structured `slog` logger (`slog.Error`, not debug-level) rather than the OTel SDK's default stdlib-`log` fallback, so the failure still surfaces as valid JSON on stdout instead of a plain-text line on stderr — the services themselves keep working either way (overview decision #3). Task 03 and Task 04 implement the code that reads these.
 
 - [x] Make both edits.
 

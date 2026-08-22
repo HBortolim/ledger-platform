@@ -29,7 +29,8 @@ It is the gate — don't start it until Tasks 01–06 are individually merged an
 | 4 | ledger-service | `outbox publish` (producer) | Task 05 |
 | 5 | projection-service | `projection apply` (consumer) | Task 05 |
 
-- [x] Record the trace ID. Screenshot the waterfall — this is the single most valuable artifact this milestone produces.
+- [x] Record the trace ID.
+- [ ] Screenshot the waterfall — this is the single most valuable artifact this milestone produces. **Deferred:** this task was executed by an agent without browser/GUI access, a known and already-ruled-on limitation (see Step 6's deferral note below and the milestone overview's "Screenshots" note).
 - [x] Confirm the visible gap between spans 3 and 4: that is real outbox lag, not a rendering artifact.
 
 ## Step 2: Automate the trace-chain check against Jaeger

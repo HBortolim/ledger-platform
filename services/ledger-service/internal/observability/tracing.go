@@ -4,6 +4,7 @@ package observability
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"go.opentelemetry.io/otel"
@@ -26,6 +27,16 @@ import (
 // propagator is installed either way, so inbound traceparent headers are
 // still parsed and outbound ones still written.
 func SetupTracing(ctx context.Context, serviceName string) (func(context.Context) error, error) {
+	// Route OTel SDK-internal errors (e.g. failed OTLP exports when no
+	// collector is present) through the structured slog logger instead of
+	// the SDK's default fallback, which writes a plain-text line via the
+	// stdlib log package straight to stderr — violating the "structured
+	// JSON to stdout, nothing else" constraint on the default `make up`
+	// path, where no collector exists and every export attempt fails.
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		slog.Error("otel sdk error", slog.Any("error", err))
+	}))
+
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},

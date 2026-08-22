@@ -37,6 +37,6 @@ The `jaeger` exporter is not in the list of valid exporters. The solution: repla
 ## Consequences
 
 - The observability stack now brings up cleanly: collector, Jaeger, Prometheus, and Grafana start without errors.
-- Application services need unconditional `OTEL_*` environment variables in `docker-compose.yml` to point at the collector. With the collector absent (e.g., `make up` without `-obs`), the exporters silently fail to connect and drop spans; the services keep running (overview decision #3: observability is optional).
+- Application services need unconditional `OTEL_*` environment variables in `docker-compose.yml` to point at the collector. With the collector absent (e.g., `make up` without `-obs`), the exporters fail to connect and drop spans; for the Go services this is no longer silent — `otel.SetErrorHandler` routes the failure through the structured `slog` logger (`slog.Error`) instead of the OTel SDK's default stdlib-`log` fallback, so it surfaces as a structured JSON log line rather than a plain-text stderr write. The services keep running either way (overview decision #3: observability is optional).
 - The collector is an additional container in the observability overlay, but not in the core `make up` stack. This maintains the invariant that the core services (Postgres, Kafka, the three application services) run standalone.
 - Services never learn about Jaeger directly; the collector is the single integration point, allowing tracing policy to be centralized and updated without restarting services.

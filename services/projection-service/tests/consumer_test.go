@@ -214,11 +214,13 @@ func TestConsumerJoinsProducerTrace(t *testing.T) {
 	}
 	t.Cleanup(c.Close)
 
-	// Drive exactly one Tick, as the sibling tests in this file do, rather
-	// than racing the async Run loop.
-	if err := c.Tick(context.Background()); err != nil {
-		t.Fatalf("Tick() = error %v, want nil", err)
-	}
+	// Poll with the same bounded tickUntil helper the sibling tests in this
+	// file use, rather than a bare Tick() on an uncancellable context --
+	// a stalled consumer-group rebalance would otherwise hang the test
+	// instead of failing it within a bounded deadline.
+	tickUntil(t, c, func() bool {
+		return walletBalance(t, pool, wallet) == "10.00"
+	})
 
 	spans := recorder.Ended()
 	if len(spans) == 0 {
