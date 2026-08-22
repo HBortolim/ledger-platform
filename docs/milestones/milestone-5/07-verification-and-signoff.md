@@ -1,6 +1,6 @@
 # Task 07 — End-to-end verification & milestone sign-off
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Cross-service
 **Depends on:** 01, 02, 03, 04, 05, 06 (all of them)
 **Blocks:** Milestone 6 kickoff
@@ -16,10 +16,10 @@ It is the gate — don't start it until Tasks 01–06 are individually merged an
 
 ## Step 1: The demonstrable
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Execute the milestone overview's demo script, steps 1–2 (two wallets, fund the source, one transfer). Record the returned `transferId`.
-- [ ] Open `http://localhost:16686`, service `wallet-service`, Find Traces, open the newest trace.
-- [ ] Confirm **one** trace containing spans from **all three** services, in this order:
+- [x] Run: `make down && make up-obs`
+- [x] Execute the milestone overview's demo script, steps 1–2 (two wallets, fund the source, one transfer). Record the returned `transferId`.
+- [x] Open `http://localhost:16686`, service `wallet-service`, Find Traces, open the newest trace.
+- [x] Confirm **one** trace containing spans from **all three** services, in this order:
 
 | # | Service | Span | From |
 |---|---|---|---|
@@ -29,8 +29,8 @@ It is the gate — don't start it until Tasks 01–06 are individually merged an
 | 4 | ledger-service | `outbox publish` (producer) | Task 05 |
 | 5 | projection-service | `projection apply` (consumer) | Task 05 |
 
-- [ ] Record the trace ID. Screenshot the waterfall — this is the single most valuable artifact this milestone produces.
-- [ ] Confirm the visible gap between spans 3 and 4: that is real outbox lag, not a rendering artifact.
+- [x] Record the trace ID. Screenshot the waterfall — this is the single most valuable artifact this milestone produces.
+- [x] Confirm the visible gap between spans 3 and 4: that is real outbox lag, not a rendering artifact.
 
 ## Step 2: Automate the trace-chain check against Jaeger
 
@@ -80,9 +80,9 @@ fi
 echo "PASS: NFR-OBS-5 — one trace spans all three services (${trace_id})"
 ```
 
-- [ ] Create the script and `chmod +x scripts/verify-trace.sh`.
-- [ ] Run it. Expected: `PASS`, listing all three services.
-- [ ] Prove it has teeth: `docker compose -f docker-compose.yml -f docker-compose.observability.yml stop projection-service`, run another transfer, wait ~10s, re-run the script. It must **FAIL** on the missing `projection-service`. Restart the service afterwards.
+- [x] Create the script and `chmod +x scripts/verify-trace.sh`.
+- [x] Run it. Expected: `PASS`, listing all three services.
+- [x] Prove it has teeth: `docker compose -f docker-compose.yml -f docker-compose.observability.yml stop projection-service`, run another transfer, wait ~10s, re-run the script. It must **FAIL** on the missing `projection-service`. Restart the service afterwards.
 
 ## Step 3: Add the Kafka-header regression test to the E2E suite
 
@@ -127,14 +127,14 @@ Then add the test, following the file's existing conventions (build tag `e2e`, t
 
 4. Assert the payload's `traceparent` field mirrors the header (ADR-0013's stated contract).
 
-- [ ] Write the test.
-- [ ] Run: `make up && make test-e2e` — expect all E2E tests green, including the new one, **against the core-only stack**. This works because Task 01 sets `OTEL_EXPORTER_OTLP_ENDPOINT` in `docker-compose.yml` unconditionally: spans are created and context injected even when the exporter can't reach a collector. Note that dependency in your report — it is the one place the E2E suite now cares about an observability setting.
+- [x] Write the test.
+- [x] Run: `make up && make test-e2e` — expect all E2E tests green, including the new one, **against the core-only stack**. This works because Task 01 sets `OTEL_EXPORTER_OTLP_ENDPOINT` in `docker-compose.yml` unconditionally: spans are created and context injected even when the exporter can't reach a collector. Note that dependency in your report — it is the one place the E2E suite now cares about an observability setting.
 
 ## Step 4: Walk the NFR-OBS checklist
 
 Verify each requirement against reality and record the evidence. Mark honestly — a partially-met NFR recorded as such is worth more than a checkmark that doesn't survive scrutiny.
 
-- [ ] **NFR-OBS-1** — logs are structured JSON on stdout with `trace_id`, `span_id`, `service`, `level`, `msg`. Check all three services:
+- [x] **NFR-OBS-1** — logs are structured JSON on stdout with `trace_id`, `span_id`, `service`, `level`, `msg`. Check all three services:
 
 ```sh
 for svc in wallet-service ledger-service projection-service; do
@@ -145,17 +145,17 @@ for svc in wallet-service ledger-service projection-service; do
 done
 ```
 
-- [ ] **NFR-OBS-2** — `traceparent` propagated over HTTP and as a Kafka header. Evidence: Task 04's outbound-header IT, Step 3's E2E test, and the `kafka-console-consumer --property print.headers=true` output.
-- [ ] **NFR-OBS-3** — `/metrics` in Prometheus format on each service, with the §7.4 metric set. Evidence: all three Prometheus targets `UP`; spot-check one metric per service in the Prometheus UI. (This was already satisfied before M5 — confirm, don't rebuild.)
-- [ ] **NFR-OBS-4** — the `Transfers Overview` dashboard with all six panels populated. Evidence: Task 06.
-- [ ] **NFR-OBS-5** — a single transfer traceable end to end in Jaeger. Evidence: Steps 1–2.
+- [x] **NFR-OBS-2** — `traceparent` propagated over HTTP and as a Kafka header. Evidence: Task 04's outbound-header IT, Step 3's E2E test, and the `kafka-console-consumer --property print.headers=true` output.
+- [x] **NFR-OBS-3** — `/metrics` in Prometheus format on each service, with the §7.4 metric set. Evidence: all three Prometheus targets `UP`; spot-check one metric per service in the Prometheus UI. (This was already satisfied before M5 — confirm, don't rebuild.)
+- [x] **NFR-OBS-4** — the `Transfers Overview` dashboard with all six panels populated. Evidence: Task 06.
+- [x] **NFR-OBS-5** — a single transfer traceable end to end in Jaeger. Evidence: Steps 1–2.
 
 ## Step 5: Confirm nothing regressed
 
-- [ ] `make test` from the repo root — full unit + integration suite across all three services, green, **with no observability stack running**.
-- [ ] `make up && make test-e2e` — E2E green against the core-only stack.
-- [ ] `make down && make up` — core stack alone comes up healthy inside the §1.1 60-second bar. Time it: `time (make up && sleep 0 )` is not meaningful; instead watch `docker compose ps` until all health-checked services report `healthy` and note the elapsed wall time.
-- [ ] Confirm no observability container is required for any of the above.
+- [x] `make test` from the repo root — full unit + integration suite across all three services, green, **with no observability stack running**.
+- [x] `make up && make test-e2e` — E2E green against the core-only stack.
+- [x] `make down && make up` — core stack alone comes up healthy inside the §1.1 60-second bar. Time it: `time (make up && sleep 0 )` is not meaningful; instead watch `docker compose ps` until all health-checked services report `healthy` and note the elapsed wall time.
+- [x] Confirm no observability container is required for any of the above.
 
 ## Step 6: Capture artifacts
 
@@ -165,15 +165,15 @@ done
 
 `SPEC.md` §12 lists `docs/results/` for exactly this. These two images are what a reviewer looks at first, before reading a line of code.
 
-- [ ] Save both screenshots. Confirm the trace screenshot legibly shows all three service names and the outbox gap.
+- [ ] Save both screenshots. **Deferred:** this task was executed by an agent without browser/GUI access, a known and already-ruled-on limitation. The same verification value was captured instead via the Jaeger and Prometheus/Grafana HTTP APIs (trace JSON, panel query results) — see the Implementation Record below. A human wanting the actual PNGs: run `make up-obs`, execute a transfer, then open `http://localhost:16686` (service `wallet-service`, newest trace) and `http://localhost:3000` (admin/admin, `Transfers Overview` dashboard).
 
 ## Step 7: Close out documentation
 
-- [ ] Update `docs/milestones/milestone-5/00-overview.md`: `Status: Complete`, and check off every item in "Definition of done" — verifying each against actual evidence, not from memory.
-- [ ] Set `Status: Complete` on Tasks 01–06's own docs and check off their step boxes, if the implementing task didn't already. (M4 shipped with two task docs still reading "Not started" — don't repeat that.)
-- [ ] Confirm ADR-0012 (Task 01) and ADR-0013 (Task 05) both exist in `docs/decisions/` and that their content matches what was actually built, not what was planned.
-- [ ] Check whether `SPEC.md` §11 tracks per-milestone status inline. As of M4 it does not — plain prose bullets, no markers. If that's still true, make no change and say so; don't invent a convention.
-- [ ] Fill in this task's Implementation Record below.
+- [x] Update `docs/milestones/milestone-5/00-overview.md`: `Status: Complete`, and check off every item in "Definition of done" — verifying each against actual evidence, not from memory.
+- [x] Set `Status: Complete` on Tasks 01–06's own docs and check off their step boxes, if the implementing task didn't already. (M4 shipped with two task docs still reading "Not started" — don't repeat that.)
+- [x] Confirm ADR-0012 (Task 01) and ADR-0013 (Task 05) both exist in `docs/decisions/` and that their content matches what was actually built, not what was planned.
+- [x] Check whether `SPEC.md` §11 tracks per-milestone status inline. As of M4 it does not — plain prose bullets, no markers. If that's still true, make no change and say so; don't invent a convention.
+- [x] Fill in this task's Implementation Record below.
 
 ## Step 8: Commit
 
@@ -213,4 +213,69 @@ break. Captures the Jaeger waterfall and Grafana dashboard in docs/results/."
 
 ## Implementation record
 
-_(Fill in after Steps 1–7: the verified trace ID, the NFR-OBS-1..5 evidence table, timing for the core-stack startup check, anything found partially met, and confirmation of the final `make test` / `make test-e2e` runs.)_
+**Executed by an agent with no browser/GUI access.** Every verification below that the brief specifies as a screenshot was instead performed against the Jaeger, Prometheus, and Grafana HTTP APIs — same evidence, no PNG. Both screenshots are deferred; see Step 6's note.
+
+### Step 1 — the demonstrable
+
+`make down && make up-obs`, then the milestone overview's demo script steps 1–2, produced trace **`9ad0db5df7e631384c96a6591fb7471a`**, queried via `GET /api/traces?service=wallet-service&limit=1&lookback=1h`. All 3 services present. The 5 spans, in start-time order, with correct `CHILD_OF` parentage confirmed from the raw span JSON:
+
+| # | Service | Span | Start (µs, relative) | Duration (µs) | Parent |
+|---|---|---|---|---|---|
+| 1 | wallet-service | `http post /transfers` | 0 | 251018 | (root) |
+| 2 | wallet-service | `http post` (client call to ledger) | 130109 | 107748 | `secured request` → chain to #1 |
+| 3 | ledger-service | `POST /ledger/postings` | 186176 | 11292 | span #2 |
+| 4 | ledger-service | `outbox publish` | 215549 | 8929 | span #3 |
+| 5 | projection-service | `projection apply` | 230224 | 21037 | span #3 |
+
+Span #3 (`POST /ledger/postings`) ends at relative 197468µs; span #4 (`outbox publish`) starts at 215549µs — an **~18ms gap**, confirmed real (not a rendering artifact) by cross-referencing against the outbox worker's poll ticker: the gap is the wait between the posting transaction committing and the next 100ms poll tick picking up the row. `docker compose logs ledger-service` / `projection-service` for this trace ID show matching `trace_id` on the `"posting created"` and `"projection consumer: apply succeeded"` log lines. Wallet-service emits no application-level log line on the happy path (see NFR-OBS-1 note below), so there is no wallet-service log line to check against this trace ID — confirmed separately on a wallet-creation log line instead.
+
+### Step 2 — `scripts/verify-trace.sh` teeth-proof
+
+Created at `scripts/verify-trace.sh`, `chmod +x`'d, byte-identical to the brief.
+
+- **PASS** (stack healthy): `PASS: NFR-OBS-5 — one trace spans all three services (2ca5bfc45626b1426b9a8c619a30979a)`.
+- **Stopped `projection-service`** (`docker compose -f docker-compose.yml -f docker-compose.observability.yml stop projection-service`), ran another transfer, waited, re-ran the script: exit code **1**, `FAIL: the end-to-end trace is broken — NFR-OBS-5 not satisfied`. Independently confirmed via the raw Jaeger API that the actual broken transfer's trace (`38f38bde7b846f27d8254dde9df472e2`) contained `wallet-service` + `ledger-service` but correctly had **no** `projection-service` span.
+- **Restarted `projection-service`**, ran another transfer, re-ran the script: back to **PASS**.
+
+**Finding (not a script bug, but a real operational wrinkle worth a follow-up):** wallet-service's `/health/live` endpoint *is* traced (Docker's healthcheck hits it every 10s), unlike the Go services, which deliberately exclude `/health/*` and `/metrics` from tracing (Task 03's design, to avoid flooding Jaeger). Combined with each service's ~5s batch-span-export delay, the "most recent trace" the script queries is frequently a wallet-service health-check trace rather than the transfer just made, requiring several retries (observed up to ~9s) before the script reliably picks up the actual transfer trace. Every observed run's PASS/FAIL verdict was still correct — a health-check-only trace correctly fails the check too, since it isn't the 3-service trace NFR-OBS-5 asks for — but a future follow-up (excluding wallet-service's own health endpoint from tracing, matching the Go services' pattern) would make the script's single-shot latency more predictable for CI use.
+
+### Step 3 — E2E Kafka-header regression test
+
+`assertLedgerPostedObserved` (`tests/e2e/helpers_test.go:241`) now returns `*kgo.Record`; all existing call sites needed no change (bare-statement calls). Added `TestE2E_TraceContextPropagatedToKafka` to `tests/e2e/transfer_e2e_test.go`, asserting a well-formed `^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$` `traceparent` Kafka header and that the payload's `traceparent` field mirrors it.
+
+Ran against the **core-only stack** (`make down && make up`, no `-obs`): `make test-e2e` → `ok github.com/ledger-platform/tests-e2e 7.731s`, and with `-v` all 5 tests individually pass, including the new one (3.07s — it consumes from Kafka same as `TestE2E_HappyPath`). **Dependency note:** this only works because Task 01 sets `OTEL_EXPORTER_OTLP_ENDPOINT` unconditionally in `docker-compose.yml` (not gated behind `up-obs`) — so both Go services create real spans and inject real `traceparent` context into the outbox row even with no collector reachable to receive the export. This is the one place the E2E suite now implicitly depends on an observability-related environment variable, though it needs no observability *container*.
+
+### Step 4 — NFR-OBS-1..5 evidence
+
+| NFR | Verdict | Evidence |
+|---|---|---|
+| **OBS-1** (structured JSON logs, 5 fields) | **Met, with one caveat** | `jq -e 'has("trace_id") and has("span_id") and has("service") and has("level") and has("msg")'` on `tail -5` of each service's live logs failed for `ledger-service`/`projection-service` on a fresh-boot tail because Gin's own startup route-registration banner (plain text, a few lines, once per boot) fell within the last 5 lines — `GIN_MODE=release` is never set in either Go service's compose environment, so this framework banner is a pre-existing gap against the Global Constraint "Structured JSON to stdout, nothing else." Filtering to JSON-shaped lines only (`grep '^{'`) confirmed every actual application log line, on all three services, is correctly shaped with all 5 required fields (plus `timestamp`). Small follow-up: set `GIN_MODE=release` for both Go services. Separately: wallet-service's `CreateTransferUseCase` happy path emits no application log line at all (only a `WARN` on a missing `Idempotency-Key`), so there is no request-scoped wallet-service log line to check trace_id population on during a transfer; trace_id population *was* confirmed correct on wallet-service via a wallet-creation log line (`trace_id":"dabdb4c1bb028838e6070274f710f534"`), which uses the identical MDC-based mechanism, so there's no reason to believe it would behave differently if a transfer-scoped log line existed. |
+| **OBS-2** (traceparent over HTTP + Kafka header) | **Met** | Task 04's outbound-header IT (`TransferControllerIT`) exists and passes (`./mvnw verify` green, part of `make test`). Step 3's new E2E test passes. Live `kafka-console-consumer --property print.headers=true` on 2 real `ledger.posted.v1` messages showed non-empty, well-formed `traceparent:00-...` headers, each byte-identical to the payload's own `traceparent` field. |
+| **OBS-3** (`/metrics` Prometheus format, §7.4 set) | **Met (pre-existing, confirmed not rebuilt)** | `GET /api/v1/targets` on Prometheus: `wallet-service`, `ledger-service`, `projection-service` all `health: "up"`. Spot-checked one metric per service directly against the Prometheus HTTP API: `wallet_requests_total` (value present), `ledger_postings_total` (value present), `projection_consumer_lag` (value present, `0`). |
+| **OBS-4** (`Transfers Overview`, 6 panels populated) | **Met** | `GET /api/dashboards/uid/transfers-overview` via the Grafana API confirms all 6 panels (Transfer RPS, Latency p50/p95/p99, Error rate by status code, Projection lag, Kafka consumer lag, Outbox depth) exist with `type: timeseries`. Extracted each panel's PromQL expression and ran it directly against Prometheus under live traffic (5 successful transfers + 1 deliberately triggered `INSUFFICIENT_FUNDS` 422): all 6 returned non-empty results, including the error-rate panel once the 422 aged past the 5m `rate()` window's minimum 2-sample requirement. |
+| **OBS-5** (one transfer traceable end to end) | **Met** | Step 1's live trace `9ad0db5df7e631384c96a6591fb7471a` (all 3 services, correct span order, ending at the projection write) plus `scripts/verify-trace.sh`'s repeated PASS runs. |
+
+Overall: **4 of 5 fully met with no caveats (OBS-2/3/4/5); OBS-1 met but with two honest caveats noted above** (Gin's non-JSON startup banner; wallet-service's happy path having no log line to check trace_id on). Neither caveat blocks the milestone's acceptance bar — both are small, well-understood follow-ups, not open regressions.
+
+### Step 5 — regression confirmation
+
+- `make test` (root, no observability stack running): **exit 0**, full suite green — wallet-service `./mvnw -q verify`, `cd services/ledger-service && go test ./...` (all packages `ok`), `cd services/projection-service && go test ./...` (all packages `ok`).
+- `make up && make test-e2e` (core-only stack): **green**, 5/5 tests including the new one.
+- `make down && make up`, timed by polling `docker compose ps` every 1s until every health-checked service (`postgres`, `kafka`, `ledger-service`, `wallet-service`) reported `healthy`: **38 seconds**, reproduced twice with an identical result. `projection-service` has no healthcheck defined in `docker-compose.yml` (pre-existing, outside M5 scope) and is correctly excluded from the health-gated timing. Well inside the §1.1 60-second bar.
+- Confirmed via `docker compose ps` during both the `make test` and `make test-e2e`/`make up` runs: only `kafka`, `ledger-service`, `postgres`, `projection-service`, `wallet-service` — no `jaeger`/`prometheus`/`grafana`/`otel-collector` container present or required at any point.
+
+### Step 6 — artifacts
+
+Both screenshots deferred (agent has no GUI access — see the note on Step 6's checklist item above). Equivalent evidence captured via API: the trace JSON in Step 1's table, and the dashboard-panel query results in the OBS-4 row above.
+
+### Step 7 — documentation closeout
+
+- `docs/milestones/milestone-5/00-overview.md`: `Status: Complete`; every "Definition of done" item checked, each with an inline evidence note (including the OBS-1 caveats above and the screenshot deferral).
+- Tasks 01–06: none had been marked complete despite all being merged and individually verified working (all `Status: Not started`, zero checked boxes) — set `Status: Complete` and checked every step box on all six, backed by spot-verification of their claims against the current repo state (no `"log"` package stragglers in either Go service; `go.mod` shows resolved OTel versions `v1.45.0` / `otelgin v0.70.0`, matching the versions seen live in the Jaeger trace's process tags; `otelgin` scoped only to the ledger's business route group, confirmed by the Step 1 trace containing no `/health` or `/metrics` spans; `transfers-overview.json` is valid JSON; `TransferControllerIT.java`, `TestOutboxRowCarriesTraceparent`, and `TestConsumerJoinsProducerTrace` all exist) plus the live re-verification already performed in Steps 1–5 of this task.
+- **ADR-0012 correction:** found a real drift between ADR-0012 and what was actually built. The ADR stated the wallet-service tracing endpoint env var as `MANAGEMENT_OTLP_TRACING_ENDPOINT`; the actual `docker-compose.yml` (and `application.yml`, extensively commented) uses `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT`, because Task 04 discovered the originally-planned property is deprecated and silently fails to bind in Spring Boot 4.0.6. Updated ADR-0012's Decision section to record the real property name and the reason for the deviation. ADR-0013 was checked against `posting.go`, `event.go`, and the consumer's carrier code and found accurate as written — no changes needed.
+- `SPEC.md` §11: confirmed still plain prose bullets with no per-milestone status markers, same as it was at M4. **No change made** — not inventing a new convention.
+- This Implementation Record.
+
+### Commit
+
+`test(observability): verify the end-to-end trace and close out Milestone 5` — see the commit log for the SHA (this record was written before committing; SHA intentionally not self-referenced here).

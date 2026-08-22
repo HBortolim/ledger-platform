@@ -1,6 +1,6 @@
 # Milestone 5 — Observability
 
-**Status:** Ready to start
+**Status:** Complete
 **Owner:** All three services + infrastructure
 **Spec reference:** [`SPEC.md` §11 — Milestone 5](../../SPEC.md), NFR-OBS-1..5, §7.3 (event schemas / `traceparent`), §7.4 (required metrics), §12 (repo layout)
 **Estimated effort:** 3 days (per roadmap)
@@ -97,15 +97,17 @@ Place both in `docs/decisions/` following the existing format. Next free number 
 
 ## Definition of done (milestone)
 
-- [ ] `make up-obs` starts the core stack plus Jaeger, Prometheus, Grafana, and the OTel Collector; all Prometheus targets report `UP` (Task 01).
-- [ ] `make up` still starts the core stack alone, with no observability containers and no startup errors (Tasks 01, 03).
-- [ ] Both Go services emit structured JSON logs to stdout with `timestamp`, `level`, `service`, `trace_id`, `span_id`, `msg` (NFR-OBS-1) (Task 02).
-- [ ] `POST /transfers` produces a single Jaeger trace spanning wallet-service → ledger-service → projection-service, ending at the projection write (NFR-OBS-5) (Tasks 03–05, verified in 07).
-- [ ] The `traceparent` in the `LEDGER_POSTED` Kafka header and payload is a real, non-empty W3C value matching the originating trace (NFR-OBS-2) (Task 05).
-- [ ] Log lines emitted during a traced request carry that trace's `trace_id` in all three services (Tasks 02–04).
-- [ ] Grafana's `Transfers Overview` shows all six NFR-OBS-4 panels with live data (Task 06).
-- [ ] `make test` and `make test-e2e` still pass with no observability stack running (Task 07).
-- [ ] ADR-0012 and ADR-0013 written (Tasks 01, 05).
+- [x] `make up-obs` starts the core stack plus Jaeger, Prometheus, Grafana, and the OTel Collector; all Prometheus targets report `UP` (Task 01). Verified live in Task 07: all three targets `UP`.
+- [x] `make up` still starts the core stack alone, with no observability containers and no startup errors (Tasks 01, 03). Verified live in Task 07: core-only stack, all health-checked services `healthy` in 38s.
+- [x] Both Go services emit structured JSON logs to stdout with `timestamp`, `level`, `service`, `trace_id`, `span_id`, `msg` (NFR-OBS-1) (Task 02). Verified via `jq -e` shape check on live container logs. Caveat: Gin's own startup route-registration banner (a few lines, once per boot) is plain text, not JSON — pre-existing, `GIN_MODE=release` was never set; the application's own log lines are all correctly JSON-shaped. See Task 07's Implementation Record.
+- [x] `POST /transfers` produces a single Jaeger trace spanning wallet-service → ledger-service → projection-service, ending at the projection write (NFR-OBS-5) (Tasks 03–05, verified in 07). Verified live: trace `9ad0db5df7e631384c96a6591fb7471a`, 5 spans, correct parent/child chain, real outbox-lag gap.
+- [x] The `traceparent` in the `LEDGER_POSTED` Kafka header and payload is a real, non-empty W3C value matching the originating trace (NFR-OBS-2) (Task 05). Verified via `kafka-console-consumer --property print.headers=true` on live traffic.
+- [x] Log lines emitted during a traced request carry that trace's `trace_id` in all three services (Tasks 02–04). Confirmed for ledger-service and projection-service against the same trace ID. Note: wallet-service's `CreateTransferUseCase` happy path emits no application-level log line (only a `WARN` on a missing `Idempotency-Key`), so there was no transfer-specific log line to check against the demo trace's ID; trace_id population on wallet-service was instead confirmed on the wallet-creation log line, which uses the same MDC-based mechanism. See Task 07's Implementation Record.
+- [x] Grafana's `Transfers Overview` shows all six NFR-OBS-4 panels with live data (Task 06). Verified live in Task 07 by querying each panel's PromQL expression directly against Prometheus under live traffic (including a deliberately triggered `INSUFFICIENT_FUNDS` 422 for the error-rate panel); all six returned non-empty results.
+- [x] `make test` and `make test-e2e` still pass with no observability stack running (Task 07). Both green; no observability container present during either run.
+- [x] ADR-0012 and ADR-0013 written (Tasks 01, 05). Both exist in `docs/decisions/` and their content matches what was actually built.
+
+**Screenshots:** `docs/results/m5-jaeger-end-to-end-trace.png` and `docs/results/m5-grafana-transfers-overview.png` are deferred — Task 07 was executed by an agent without GUI/browser access. All the verification value those screenshots would provide was instead captured via the Jaeger, Prometheus, and Grafana HTTP APIs (see Task 07's Implementation Record for the raw evidence). A human wanting the actual PNGs can capture them with `make up-obs`, running a transfer, then: opening `http://localhost:16686`, searching service `wallet-service`, and opening the newest trace; and opening `http://localhost:3000` (admin/admin) → `Transfers Overview` dashboard.
 
 ---
 

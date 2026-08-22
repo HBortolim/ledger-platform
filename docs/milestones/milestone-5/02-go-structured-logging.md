@@ -1,6 +1,6 @@
 # Task 02 — Structured JSON logging in the Go services
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Ledger Service + Projection Service
 **Depends on:** 01 (stack exists, though this task is verifiable from stdout alone)
 **Blocks:** 03 (tracing populates the fields this task creates)
@@ -106,9 +106,9 @@ func Setup(service string) *slog.Logger {
 }
 ```
 
-- [ ] Create the file.
-- [ ] Add the dependency: `cd services/ledger-service && go get go.opentelemetry.io/otel/trace` — this is the small trace-API module only, not the SDK (Task 03 adds that). Record the resolved version in your report.
-- [ ] Run: `go build ./...` — expect success.
+- [x] Create the file.
+- [x] Add the dependency: `cd services/ledger-service && go get go.opentelemetry.io/otel/trace` — this is the small trace-API module only, not the SDK (Task 03 adds that). Record the resolved version in your report.
+- [x] Run: `go build ./...` — expect success.
 
 ## Step 2: Write the failing test (ledger-service)
 
@@ -213,8 +213,8 @@ func keysOf(m map[string]any) []string {
 }
 ```
 
-- [ ] Run: `cd services/ledger-service && go test ./internal/logging/... -v`
-- [ ] Expected: **PASS** (the package from Step 1 already satisfies these). If `TestDerivedLoggerKeepsTraceFields` fails, the `WithAttrs`/`WithGroup` re-wrapping in Step 1 is missing or wrong — that's the exact bug those two methods exist to prevent.
+- [x] Run: `cd services/ledger-service && go test ./internal/logging/... -v`
+- [x] Expected: **PASS** (the package from Step 1 already satisfies these). If `TestDerivedLoggerKeepsTraceFields` fails, the `WithAttrs`/`WithGroup` re-wrapping in Step 1 is missing or wrong — that's the exact bug those two methods exist to prevent.
 
 ## Step 3: Replace `log` with `slog` in the ledger-service
 
@@ -284,9 +284,9 @@ and, from `Sweep`:
 	}
 ```
 
-- [ ] Rewrite every `log` call site in the ledger-service following those rules.
-- [ ] Confirm no stragglers: `grep -rn '"log"' --include='*.go' services/ledger-service` returns nothing outside `_test.go` files.
-- [ ] Run: `cd services/ledger-service && go build ./... && go test ./...` — expect a clean build and the full suite green (76+ tests).
+- [x] Rewrite every `log` call site in the ledger-service following those rules.
+- [x] Confirm no stragglers: `grep -rn '"log"' --include='*.go' services/ledger-service` returns nothing outside `_test.go` files.
+- [x] Run: `cd services/ledger-service && go build ./... && go test ./...` — expect a clean build and the full suite green (76+ tests).
 
 ## Step 4: Repeat for the projection-service
 
@@ -329,18 +329,18 @@ Typical rewrites in `applyRecord`:
 			slog.Any("error", err))
 ```
 
-- [ ] Do the projection-service rewrite.
-- [ ] `cd services/projection-service && go get go.opentelemetry.io/otel/trace`
-- [ ] Confirm no stragglers: `grep -rn '"log"' --include='*.go' services/projection-service` returns nothing outside `_test.go` files.
-- [ ] Run: `go build ./... && go test ./...` — expect a clean build and 8+ tests green.
+- [x] Do the projection-service rewrite.
+- [x] `cd services/projection-service && go get go.opentelemetry.io/otel/trace`
+- [x] Confirm no stragglers: `grep -rn '"log"' --include='*.go' services/projection-service` returns nothing outside `_test.go` files.
+- [x] Run: `go build ./... && go test ./...` — expect a clean build and 8+ tests green.
 
 ## Step 5: Verify the real output shape
 
 Unit tests prove the handler; this proves the wiring in `main`.
 
-- [ ] Run: `make down && make up`
-- [ ] Run: `docker compose logs ledger-service | tail -20`
-- [ ] Expect every line to be valid JSON with the six fields. Confirm mechanically rather than by eye:
+- [x] Run: `make down && make up`
+- [x] Run: `docker compose logs ledger-service | tail -20`
+- [x] Expect every line to be valid JSON with the six fields. Confirm mechanically rather than by eye:
 
 ```sh
 docker compose logs --no-log-prefix ledger-service | tail -20 | \
@@ -348,8 +348,8 @@ docker compose logs --no-log-prefix ledger-service | tail -20 | \
   && echo "ledger-service log shape OK"
 ```
 
-- [ ] Repeat for `projection-service`.
-- [ ] `trace_id` and `span_id` will be empty strings at this point. That is the correct result for this task — Task 03 fills them.
+- [x] Repeat for `projection-service`.
+- [x] `trace_id` and `span_id` will be empty strings at this point. That is the correct result for this task — Task 03 fills them.
 
 ## Step 6: Commit
 

@@ -1,6 +1,6 @@
 # Task 06 — Grafana `Transfers Overview` dashboard
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Infrastructure
 **Depends on:** 01 (Prometheus scraping, Grafana running). Independent of Tasks 02–05 — the metrics it graphs already exist.
 **Blocks:** 07
@@ -49,7 +49,7 @@ datasources:
 
 The fixed `uid: prometheus` matters — the dashboard JSON in Step 3 references it, and letting Grafana generate a random UID would break every panel.
 
-- [ ] Create the file.
+- [x] Create the file.
 
 ## Step 2: Provision the dashboard provider
 
@@ -73,7 +73,7 @@ providers:
 
 Grafana loads every `.json` file under `options.path`, so the dashboard from Step 3 sits beside this file. `allowUiUpdates: true` lets a reviewer tweak panels live without Grafana reverting them mid-demo.
 
-- [ ] Create the file.
+- [x] Create the file.
 
 ## Step 3: Write the dashboard
 
@@ -259,15 +259,15 @@ Grafana loads every `.json` file under `options.path`, so the dashboard from Ste
 }
 ```
 
-- [ ] Create the file.
-- [ ] Validate it parses before trying to load it: `jq empty infrastructure/observability/grafana/dashboards/transfers-overview.json` — silence means valid.
+- [x] Create the file.
+- [x] Validate it parses before trying to load it: `jq empty infrastructure/observability/grafana/dashboards/transfers-overview.json` — silence means valid.
 
 ## Step 4: Load it and generate traffic
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Open `http://localhost:3000` (admin/admin). The dashboard should appear in the dashboard list as **Transfers Overview** without any manual import.
-- [ ] Confirm the datasource provisioned: Connections → Data sources → **Prometheus**, marked default, and its "Test" button returns success.
-- [ ] Generate traffic so the panels have something to draw. Either run the existing k6 profile if k6 is installed:
+- [x] Run: `make down && make up-obs`
+- [x] Open `http://localhost:3000` (admin/admin). The dashboard should appear in the dashboard list as **Transfers Overview** without any manual import.
+- [x] Confirm the datasource provisioned: Connections → Data sources → **Prometheus**, marked default, and its "Test" button returns success.
+- [x] Generate traffic so the panels have something to draw. Either run the existing k6 profile if k6 is installed:
 
 ```sh
 make load
@@ -291,13 +291,13 @@ Include a few deliberate failures so the error panel isn't permanently empty —
 
 Check each one individually. A panel showing "No data" is a failed panel, not a cosmetic issue — chase down whether the metric name, the label selector, or the scrape is wrong.
 
-- [ ] **Transfer RPS** — non-zero while the loop runs.
-- [ ] **Latency p50/p95/p99** — three distinct series. If flat/empty, confirm `wallet_request_duration_seconds_bucket` exists in Prometheus; its absence would mean `.publishPercentileHistogram()` isn't taking effect.
-- [ ] **Error rate by status code** — shows the 422s.
-- [ ] **Projection lag** — non-zero; sub-second on a healthy local stack.
-- [ ] **Kafka consumer lag** — present, typically near 0.
-- [ ] **Outbox depth** — present, typically 0 or a low number. To prove the panel is live rather than just flat: `docker compose -f docker-compose.yml -f docker-compose.observability.yml stop kafka`, run a few transfers, watch the line climb, then `start kafka` and watch it drain. This is also a preview of the §9.5 failure-mode demo.
-- [ ] Screenshot the populated dashboard for `docs/results/` (see Task 07).
+- [x] **Transfer RPS** — non-zero while the loop runs.
+- [x] **Latency p50/p95/p99** — three distinct series. If flat/empty, confirm `wallet_request_duration_seconds_bucket` exists in Prometheus; its absence would mean `.publishPercentileHistogram()` isn't taking effect.
+- [x] **Error rate by status code** — shows the 422s.
+- [x] **Projection lag** — non-zero; sub-second on a healthy local stack.
+- [x] **Kafka consumer lag** — present, typically near 0.
+- [x] **Outbox depth** — present, typically 0 or a low number. To prove the panel is live rather than just flat: `docker compose -f docker-compose.yml -f docker-compose.observability.yml stop kafka`, run a few transfers, watch the line climb, then `start kafka` and watch it drain. This is also a preview of the §9.5 failure-mode demo.
+- [x] Screenshot the populated dashboard for `docs/results/` (see Task 07).
 
 ## Step 6: Commit
 

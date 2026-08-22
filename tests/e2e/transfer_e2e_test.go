@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -129,4 +130,63 @@ func TestE2E_InsufficientFunds(t *testing.T) {
 	}
 
 	assertLedgerEntryCount(t, source, 1) // only the seed deposit's CREDIT entry -- the rejected attempt wrote nothing
+}
+
+// TestE2E_TraceContextPropagatedToKafka guards NFR-OBS-2/NFR-OBS-5's async
+// propagation chain: the ledger.posted.v1 record produced for a transfer
+// must carry a well-formed W3C traceparent Kafka header, and the payload's
+// mirror field must match it (ADR-0013). This runs against the core-only
+// stack -- no observability containers required -- because Task 01 sets
+// OTEL_EXPORTER_OTLP_ENDPOINT unconditionally in docker-compose.yml, so
+// spans are created and context injected even when the exporter can't reach
+// a collector.
+func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
+	userID := uuid.New()
+	token := signJWT(t, userID, "user")
+	source := newWallet(t, token, userID)
+	destination := newWallet(t, token, uuid.New())
+	seedDeposit(t, source, "500.00")
+
+	key := uuid.New().String()
+	resp, body := postTransfer(t, token, key, source, destination, "100.00")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /transfers = %d, want 201; body: %s", resp.StatusCode, body)
+	}
+	var created struct {
+		TransferID string `json:"transferId"`
+	}
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatalf("decode transfer response: %v", err)
+	}
+	transactionID := uuid.MustParse(created.TransferID)
+
+	record := assertLedgerPostedObserved(t, transactionID)
+
+	// NFR-OBS-2: the Kafka hop must carry W3C trace context. Before M5 this
+	// header was hardcoded empty (posting.go's "wired in M5" placeholder), so
+	// an empty value here means the propagation chain has regressed and the
+	// end-to-end trace is silently broken in two.
+	var traceparent string
+	for _, h := range record.Headers {
+		if h.Key == "traceparent" {
+			traceparent = string(h.Value)
+		}
+	}
+	if traceparent == "" {
+		t.Fatal("ledger.posted.v1 record carries no traceparent header (NFR-OBS-2)")
+	}
+	if !regexp.MustCompile(`^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$`).MatchString(traceparent) {
+		t.Errorf("traceparent = %q, want a well-formed W3C traceparent", traceparent)
+	}
+
+	// ADR-0013: the payload's traceparent field is a mirror of the header.
+	var payload struct {
+		Traceparent string `json:"traceparent"`
+	}
+	if err := json.Unmarshal(record.Value, &payload); err != nil {
+		t.Fatalf("decode ledger.posted.v1 payload: %v", err)
+	}
+	if payload.Traceparent != traceparent {
+		t.Errorf("payload traceparent = %q, want to match header traceparent %q", payload.Traceparent, traceparent)
+	}
 }

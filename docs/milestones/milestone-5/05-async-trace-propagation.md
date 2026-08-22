@@ -1,6 +1,6 @@
 # Task 05 — Trace context across outbox → Kafka → projection
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Ledger Service + Projection Service
 **Depends on:** 03 (a live ledger span to capture), 04 (so that span has a wallet-side parent)
 **Blocks:** 07
@@ -104,8 +104,8 @@ Add the imports `go.opentelemetry.io/otel` and `go.opentelemetry.io/otel/propaga
 
 Note the graceful degradation: with no active span, `Inject` writes nothing, the carrier stays empty, and the row gets `{}` headers and `""` traceparent — byte-identical to today's behavior, so every existing outbox and E2E test keeps passing unchanged.
 
-- [ ] Make the edits.
-- [ ] Run: `cd services/ledger-service && go build ./...`
+- [x] Make the edits.
+- [x] Run: `cd services/ledger-service && go build ./...`
 
 ## Step 2: Write the failing test for injection
 
@@ -186,9 +186,9 @@ func TestOutboxRowCarriesTraceparent(t *testing.T) {
 
 Add imports as needed: `encoding/json`, `regexp`, `strings`, `go.opentelemetry.io/otel`, `go.opentelemetry.io/otel/propagation`, `sdktrace "go.opentelemetry.io/otel/sdk/trace"`.
 
-- [ ] Add the test.
-- [ ] Run: `go test ./tests/... -run TestOutboxRowCarriesTraceparent -v`
-- [ ] Expected: **PASS** with Step 1 applied. Confirm it has teeth by temporarily reverting Step 1's injection to the old `map[string]string{"traceparent": ""}` — it must fail on "the M2 placeholder is still in place". Restore afterwards.
+- [x] Add the test.
+- [x] Run: `go test ./tests/... -run TestOutboxRowCarriesTraceparent -v`
+- [x] Expected: **PASS** with Step 1 applied. Confirm it has teeth by temporarily reverting Step 1's injection to the old `map[string]string{"traceparent": ""}` — it must fail on "the M2 placeholder is still in place". Restore afterwards.
 
 ## Step 3: Add a publish span in the outbox worker
 
@@ -292,8 +292,8 @@ and, in the results loop:
 
 Imports to add: `go.opentelemetry.io/otel`, `go.opentelemetry.io/otel/attribute`, `go.opentelemetry.io/otel/codes`, `go.opentelemetry.io/otel/trace`.
 
-- [ ] Make the edits.
-- [ ] Run: `go build ./... && go test ./...` — expect the full ledger suite green, including the existing `TestOutboxWorker_PublishesToKafka` (TST-INT-2).
+- [x] Make the edits.
+- [x] Run: `go build ./... && go test ./...` — expect the full ledger suite green, including the existing `TestOutboxWorker_PublishesToKafka` (TST-INT-2).
 
 ## Step 4: Extract the context in the projection consumer
 
@@ -374,8 +374,8 @@ Add error recording on the two failure paths already in the function:
 	}
 ```
 
-- [ ] Make the edits.
-- [ ] Run: `cd services/projection-service && go build ./... && go test ./...` — expect green.
+- [x] Make the edits.
+- [x] Run: `cd services/projection-service && go build ./... && go test ./...` — expect green.
 
 ## Step 5: Write the failing test for extraction
 
@@ -477,17 +477,17 @@ func TestConsumerJoinsProducerTrace(t *testing.T) {
 
 Import `"go.opentelemetry.io/otel/sdk/trace/tracetest"` for the recorder.
 
-- [ ] Write the test against this package's existing harness — reuse its container/consumer setup rather than standing up a second one.
-- [ ] Run it. Expected: **PASS**. Confirm it has teeth by temporarily removing the `Extract` line in Step 4 — the trace ID must then differ from `wantTraceID`. Restore afterwards.
+- [x] Write the test against this package's existing harness — reuse its container/consumer setup rather than standing up a second one.
+- [x] Run it. Expected: **PASS**. Confirm it has teeth by temporarily removing the `Extract` line in Step 4 — the trace ID must then differ from `wantTraceID`. Restore afterwards.
 
 ## Step 6: See the whole trace end to end
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Run the full transfer flow (steps 1–2 of the milestone overview's demo script).
-- [ ] Open `http://localhost:16686`, service `wallet-service`, Find Traces, open the newest.
-- [ ] Expect **one** trace containing, in order: a wallet-service `POST /transfers` server span, a wallet-service client span, a ledger-service `POST /ledger/postings` server span, a ledger-service `outbox publish` producer span, and a projection-service `projection apply` consumer span.
-- [ ] Confirm the visible time gap between the posting span and the publish span — that gap is the outbox lag, and being able to see it is the point of Step 3.
-- [ ] Confirm the header is non-empty on the wire:
+- [x] Run: `make down && make up-obs`
+- [x] Run the full transfer flow (steps 1–2 of the milestone overview's demo script).
+- [x] Open `http://localhost:16686`, service `wallet-service`, Find Traces, open the newest.
+- [x] Expect **one** trace containing, in order: a wallet-service `POST /transfers` server span, a wallet-service client span, a ledger-service `POST /ledger/postings` server span, a ledger-service `outbox publish` producer span, and a projection-service `projection apply` consumer span.
+- [x] Confirm the visible time gap between the posting span and the publish span — that gap is the outbox lag, and being able to see it is the point of Step 3.
+- [x] Confirm the header is non-empty on the wire:
 
 ```sh
 docker compose exec kafka kafka-console-consumer \
@@ -509,8 +509,8 @@ Following the house ADR format, record:
 - **Alternatives considered:** (a) **span links** — the usual messaging-semantic-conventions choice, and better for high-fanout batch consumers, but it produces *separate* traces and would fail NFR-OBS-5's "traced end-to-end … through to the projection write" outright; (b) **payload field as the carrier** — works, but puts propagation concerns inside the business schema and breaks any consumer that only reads headers; (c) **re-reading ambient context at publish time** — impossible, the worker publishes on its own goroutine long after the request ended.
 - **Consequences:** traces for a busy wallet can be long-lived; a consumer that fans one event into many downstream calls will nest under the original transfer's trace, which is desirable here and would need revisiting if fan-out grows. Empty context (tracing disabled) degrades to today's exact behavior.
 
-- [ ] Write the ADR.
-- [ ] Commit:
+- [x] Write the ADR.
+- [x] Commit:
 
 ```bash
 git add services/ledger-service/internal/repository/posting.go \

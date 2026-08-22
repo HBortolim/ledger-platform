@@ -1,6 +1,6 @@
 # Task 03 — OTel SDK and HTTP tracing in the Go services
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Ledger Service + Projection Service
 **Depends on:** 01 (a collector to export to), 02 (the log fields this task populates)
 **Blocks:** 05 (needs a live span on the ledger side to capture into the outbox)
@@ -23,7 +23,7 @@ At the end of this task, `POST /ledger/postings` called directly with `curl` pro
 
 ## Step 1: Add the dependencies
 
-- [ ] Run, in `services/ledger-service`:
+- [x] Run, in `services/ledger-service`:
 
 ```sh
 go get go.opentelemetry.io/otel
@@ -32,8 +32,8 @@ go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
 go get go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin
 ```
 
-- [ ] Run the same in `services/projection-service`, **omitting `otelgin`** — the projection service exposes only `/health/*` and `/metrics`, neither of which is traced (see Step 3's rationale).
-- [ ] Record every resolved version in your report. Versions are deliberately unpinned here because the correct current versions can't be verified from the plan; whatever `go get` resolves is the record.
+- [x] Run the same in `services/projection-service`, **omitting `otelgin`** — the projection service exposes only `/health/*` and `/metrics`, neither of which is traced (see Step 3's rationale).
+- [x] Record every resolved version in your report. Versions are deliberately unpinned here because the correct current versions can't be verified from the plan; whatever `go get` resolves is the record.
 
 ## Step 2: Write the tracing package (ledger-service)
 
@@ -106,8 +106,8 @@ func SetupTracing(ctx context.Context, serviceName string) (func(context.Context
 }
 ```
 
-- [ ] Create the file.
-- [ ] Run: `go build ./...` — expect success.
+- [x] Create the file.
+- [x] Run: `go build ./...` — expect success.
 
 ## Step 3: Instrument the ledger-service's business routes
 
@@ -153,8 +153,8 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHa
 }
 ```
 
-- [ ] Make the edit.
-- [ ] Run: `go build ./... && go test ./...` — expect the full ledger suite green. The existing `posting_http_test.go` exercises these routes; if it fails, the middleware has changed handler behavior and that's a real regression to investigate, not a test to adjust.
+- [x] Make the edit.
+- [x] Run: `go build ./... && go test ./...` — expect the full ledger suite green. The existing `posting_http_test.go` exercises these routes; if it fails, the middleware has changed handler behavior and that's a real regression to investigate, not a test to adjust.
 
 ## Step 4: Call SetupTracing from the ledger-service main
 
@@ -180,8 +180,8 @@ Insert immediately after the signal context is created and before the config loa
 	}()
 ```
 
-- [ ] Make the edit, adding the `internal/observability` import.
-- [ ] Run: `go build ./...` — expect success.
+- [x] Make the edit, adding the `internal/observability` import.
+- [x] Run: `go build ./...` — expect success.
 
 ## Step 5: Repeat the provider setup for the projection-service
 
@@ -191,15 +191,15 @@ Insert immediately after the signal context is created and before the config loa
 
 The projection service gets **no** HTTP instrumentation: its only routes are `/health/*` and `/metrics`. Its spans come from the Kafka consumer, which Task 05 adds. Installing the provider now means Task 05 has a tracer to use and Task 02's log fields start populating the moment a consumer span exists.
 
-- [ ] Create the file and wire `main`.
-- [ ] Run: `cd services/projection-service && go build ./... && go test ./...` — expect green.
+- [x] Create the file and wire `main`.
+- [x] Run: `cd services/projection-service && go build ./... && go test ./...` — expect green.
 
 ## Step 6: Verify a real span reaches Jaeger
 
 This is the acceptance test for the task and does not depend on Tasks 04 or 05.
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Post a balanced transaction straight at the Ledger Service (the M2 demo call):
+- [x] Run: `make down && make up-obs`
+- [x] Post a balanced transaction straight at the Ledger Service (the M2 demo call):
 
 ```sh
 TX=$(uuidgen)
@@ -211,26 +211,26 @@ curl -s -X POST http://localhost:8081/ledger/postings \
          {\"accountId\":\"$(uuidgen)\",\"entryType\":\"CREDIT\",\"amount\":\"100.00\"}]}"
 ```
 
-- [ ] Open `http://localhost:16686`, select service **`ledger-service`**, Find Traces.
-- [ ] Expect a trace containing a `POST /ledger/postings` span. Record its trace ID.
-- [ ] Confirm no `GET /health/live` or `GET /metrics` spans appear — Step 3's scoping is what prevents them, and their presence means the middleware got attached too broadly.
+- [x] Open `http://localhost:16686`, select service **`ledger-service`**, Find Traces.
+- [x] Expect a trace containing a `POST /ledger/postings` span. Record its trace ID.
+- [x] Confirm no `GET /health/live` or `GET /metrics` spans appear — Step 3's scoping is what prevents them, and their presence means the middleware got attached too broadly.
 
 ## Step 7: Verify trace correlation reached the logs
 
 This closes the loop with Task 02 and is the first point where NFR-OBS-1's `trace_id` field carries real data.
 
-- [ ] Run: `docker compose logs --no-log-prefix ledger-service | jq -r 'select(.trace_id != null and .trace_id != "") | "\(.trace_id) \(.msg)"' | tail`
-- [ ] Expect at least one line whose `trace_id` matches the trace ID recorded in Step 6.
-- [ ] If every `trace_id` is still empty: the emitting call site is using `slog.Info(...)` rather than `slog.InfoContext(ctx, ...)`, or is running outside the request's context. Note which, and fix the call site rather than the handler.
+- [x] Run: `docker compose logs --no-log-prefix ledger-service | jq -r 'select(.trace_id != null and .trace_id != "") | "\(.trace_id) \(.msg)"' | tail`
+- [x] Expect at least one line whose `trace_id` matches the trace ID recorded in Step 6.
+- [x] If every `trace_id` is still empty: the emitting call site is using `slog.Info(...)` rather than `slog.InfoContext(ctx, ...)`, or is running outside the request's context. Note which, and fix the call site rather than the handler.
 
 ## Step 8: Verify tracing stays optional
 
 Guard for overview decision #3 — this is the check that keeps CI and the E2E suite working.
 
-- [ ] Run: `make down && make up` (core stack only, no collector, `OTEL_EXPORTER_OTLP_ENDPOINT` still set in compose but pointing at a host that doesn't exist)
-- [ ] Expect all three services to start and report healthy. The OTLP exporter will fail to connect in the background; that must not surface as a startup failure or a crash.
-- [ ] Run: `make test-e2e` — expect TST-E2E-1..4 green.
-- [ ] Additionally confirm the unset-endpoint path: `cd services/ledger-service && OTEL_EXPORTER_OTLP_ENDPOINT= go test ./...` — green, with no exporter goroutines left running.
+- [x] Run: `make down && make up` (core stack only, no collector, `OTEL_EXPORTER_OTLP_ENDPOINT` still set in compose but pointing at a host that doesn't exist)
+- [x] Expect all three services to start and report healthy. The OTLP exporter will fail to connect in the background; that must not surface as a startup failure or a crash.
+- [x] Run: `make test-e2e` — expect TST-E2E-1..4 green.
+- [x] Additionally confirm the unset-endpoint path: `cd services/ledger-service && OTEL_EXPORTER_OTLP_ENDPOINT= go test ./...` — green, with no exporter goroutines left running.
 
 ## Step 9: Commit
 

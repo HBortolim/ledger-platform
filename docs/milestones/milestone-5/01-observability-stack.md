@@ -1,6 +1,6 @@
 # Task 01 — Stand up the observability stack
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Infrastructure
 **Depends on:** nothing
 **Blocks:** every other task in this milestone (nothing is verifiable until a span can land in Jaeger)
@@ -28,9 +28,9 @@ The Collector's `jaeger` exporter was deprecated in mid-2023 and subsequently **
 
 ## Step 1: Confirm the collector is actually broken
 
-- [ ] Run: `docker compose -f docker-compose.observability.yml up otel-collector`
-- [ ] Expected: the container exits with an error naming the `jaeger` exporter as unknown/invalid. Capture the exact message for your report — it justifies the change in Step 2 and belongs in ADR-0012.
-- [ ] Stop it: `docker compose -f docker-compose.observability.yml down`
+- [x] Run: `docker compose -f docker-compose.observability.yml up otel-collector`
+- [x] Expected: the container exits with an error naming the `jaeger` exporter as unknown/invalid. Capture the exact message for your report — it justifies the change in Step 2 and belongs in ADR-0012.
+- [x] Stop it: `docker compose -f docker-compose.observability.yml down`
 
 ## Step 2: Fix the collector config
 
@@ -74,7 +74,7 @@ service:
       exporters: [prometheus]
 ```
 
-- [ ] Make the edit above.
+- [x] Make the edit above.
 
 ## Step 3: Fix the observability compose file
 
@@ -127,7 +127,7 @@ services:
 
 Note the deliberate omissions: no `version:` key (obsolete in modern Compose and emits a warning), and no `depends_on` from the application services to the collector — per overview decision #3, a missing collector must never block or break the core stack.
 
-- [ ] Make the edit above.
+- [x] Make the edit above.
 
 ## Step 4: Point the services at the collector
 
@@ -149,7 +149,7 @@ Add to the `environment:` block of **`wallet-service`** (Spring's OTLP exporter 
 
 These are set unconditionally in `docker-compose.yml` even though the collector only exists in the observability overlay. That is intentional and safe: with no collector running, the exporters fail to connect, log at debug, and drop spans — the services themselves keep working (overview decision #3). Task 03 and Task 04 implement the code that reads these.
 
-- [ ] Make both edits.
+- [x] Make both edits.
 
 ## Step 5: Add the Makefile targets
 
@@ -170,25 +170,25 @@ down-obs:
 
 Leave the existing `up` and `down` targets exactly as they are — `make up` must stay core-only.
 
-- [ ] Make the edit, adding `up-obs down-obs` to the `.PHONY` line.
+- [x] Make the edit, adding `up-obs down-obs` to the `.PHONY` line.
 
 ## Step 6: Verify the whole stack
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Wait for startup, then check every container is running: `docker compose -f docker-compose.yml -f docker-compose.observability.yml ps` — expect no container in `Exit`/`Restarting` state, especially `otel-collector`.
-- [ ] Collector started clean: `docker compose -f docker-compose.yml -f docker-compose.observability.yml logs otel-collector` — expect `Everything is ready. Begin running and processing data.` and **no** exporter errors.
-- [ ] Prometheus targets: open `http://localhost:9090/targets` — all three of `wallet-service`, `ledger-service`, `projection-service` must show `UP`. (Their metrics already exist from M2/M3; this proves the scrape config is correct.)
-- [ ] Jaeger UI loads: `http://localhost:16686`. The service dropdown will be **empty** — correct at this stage, since no service emits spans until Tasks 03/04.
-- [ ] Grafana loads: `http://localhost:3000` (admin/admin). No dashboards yet — that's Task 06.
+- [x] Run: `make down && make up-obs`
+- [x] Wait for startup, then check every container is running: `docker compose -f docker-compose.yml -f docker-compose.observability.yml ps` — expect no container in `Exit`/`Restarting` state, especially `otel-collector`.
+- [x] Collector started clean: `docker compose -f docker-compose.yml -f docker-compose.observability.yml logs otel-collector` — expect `Everything is ready. Begin running and processing data.` and **no** exporter errors.
+- [x] Prometheus targets: open `http://localhost:9090/targets` — all three of `wallet-service`, `ledger-service`, `projection-service` must show `UP`. (Their metrics already exist from M2/M3; this proves the scrape config is correct.)
+- [x] Jaeger UI loads: `http://localhost:16686`. The service dropdown will be **empty** — correct at this stage, since no service emits spans until Tasks 03/04.
+- [x] Grafana loads: `http://localhost:3000` (admin/admin). No dashboards yet — that's Task 06.
 
 ## Step 7: Verify the core stack is still independent
 
 This is the guard for overview decision #3 — do not skip it.
 
-- [ ] Run: `make down && make up`
-- [ ] Expect only the core containers (postgres, kafka, the two migrate jobs, topics-init, and the three services) — no jaeger/prometheus/grafana/collector.
-- [ ] All three services healthy: `docker compose ps` shows the health-checked services as `healthy`.
-- [ ] Run: `make test-e2e` — expect TST-E2E-1..4 green against the core-only stack.
+- [x] Run: `make down && make up`
+- [x] Expect only the core containers (postgres, kafka, the two migrate jobs, topics-init, and the three services) — no jaeger/prometheus/grafana/collector.
+- [x] All three services healthy: `docker compose ps` shows the health-checked services as `healthy`.
+- [x] Run: `make test-e2e` — expect TST-E2E-1..4 green against the core-only stack.
 
 ## Step 8: Write ADR-0012 and commit
 
@@ -203,8 +203,8 @@ Follow the existing ADR format (see `docs/decisions/0008-system-account-may-over
 - **Alternatives considered:** (a) services export directly to Jaeger — simpler, one fewer container, but discards a file `SPEC.md` §12 lists as a first-class artifact and gives up the central place to add sampling/filtering later; (b) keep the collector but pin an older image that still has the `jaeger` exporter — rejected, pinning to a removed-feature version to avoid a two-line config change is backwards.
 - **Consequences:** one more container in the observability overlay; services never learn about Jaeger directly; observability stays fully optional (decision #3).
 
-- [ ] Write the ADR.
-- [ ] Commit:
+- [x] Write the ADR.
+- [x] Commit:
 
 ```bash
 git add infrastructure/observability/otel-collector.yml docker-compose.observability.yml \

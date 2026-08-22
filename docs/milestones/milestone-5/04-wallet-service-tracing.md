@@ -1,6 +1,6 @@
 # Task 04 — Wallet Service tracing and outbound propagation
 
-**Status:** Not started
+**Status:** Complete
 **Owner:** Wallet Service
 **Depends on:** 01 (a collector to export to). Independent of Tasks 02/03 — this is pure Java and can run in parallel with them.
 **Blocks:** 05 (the ledger's captured span context must have a wallet-side parent, or the "end-to-end" trace starts in the wrong place)
@@ -73,7 +73,7 @@ Two deliberate details:
 - The tracing endpoint **defaults to empty**, not to a localhost URL. Task 01 sets `MANAGEMENT_OTLP_TRACING_ENDPOINT` in `docker-compose.yml`; outside compose (local runs, tests) the exporter stays unconfigured and nothing tries to reach a collector that isn't there — overview decision #3.
 - Delete the now-redundant `otel.exporter.otlp.endpoint` block at the bottom of the file if nothing else reads it. It points at `:4317` (gRPC), which is the wrong port for Spring's http/protobuf exporter and would mislead the next reader. Confirm with `grep -rn "otel.exporter" services/wallet-service/src` before removing.
 
-- [ ] Make the edits.
+- [x] Make the edits.
 
 ## Step 2: Fix the RestClient wiring
 
@@ -144,8 +144,8 @@ public class LedgerClientConfig {
 
 The HTTP/1.1 pinning is load-bearing — it's shared by both paths through `jdkRequestFactory` rather than duplicated, and must not be dropped.
 
-- [ ] Make the edit.
-- [ ] Run: `cd services/wallet-service && ./mvnw -q compile` — expect success.
+- [x] Make the edit.
+- [x] Run: `cd services/wallet-service && ./mvnw -q compile` — expect success.
 
 ## Step 3: Write the failing test for outbound propagation
 
@@ -183,9 +183,9 @@ Add the required static import alongside the existing WireMock ones:
 import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 ```
 
-- [ ] Add the test and the import.
-- [ ] Run: `./mvnw verify -Dit.test=TransferControllerIT -DfailIfNoTests=true`
-- [ ] Expected: **PASS**, because Step 2 is already done. To confirm the test actually has teeth, temporarily revert `ledgerRestClient` to `buildRestClient(props.url(), CONNECT_TIMEOUT, READ_TIMEOUT)`, re-run, and watch it fail on a missing `traceparent` header. Restore Step 2 afterwards and note both outcomes in your report — a green test that would also pass against the bug is worth nothing here.
+- [x] Add the test and the import.
+- [x] Run: `./mvnw verify -Dit.test=TransferControllerIT -DfailIfNoTests=true`
+- [x] Expected: **PASS**, because Step 2 is already done. To confirm the test actually has teeth, temporarily revert `ledgerRestClient` to `buildRestClient(props.url(), CONNECT_TIMEOUT, READ_TIMEOUT)`, re-run, and watch it fail on a missing `traceparent` header. Restore Step 2 afterwards and note both outcomes in your report — a green test that would also pass against the bug is worth nothing here.
 
 **If the test fails even with Step 2 in place**, the likely cause is that no tracer is active in the test context (no exporter configured means Boot may not create a `Tracer`). Diagnose before working around it: check whether a `Tracer` bean exists in the context. If tracing genuinely requires an exporter to activate, add a test-scoped property that enables a no-op/in-memory exporter rather than deleting the assertion — and record what you found. Do **not** weaken the regex or drop the test.
 
@@ -193,21 +193,21 @@ import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 
 The log pattern at `application.yml:44` already has `%X{traceId}`/`%X{spanId}`; Micrometer Tracing populates that MDC automatically once a tracer is active. This step confirms it.
 
-- [ ] Run: `make down && make up-obs`
-- [ ] Run a transfer (steps 1–2 of the milestone overview's demo script).
-- [ ] Run: `docker compose logs --no-log-prefix wallet-service | jq -r 'select(.trace_id != "") | "\(.trace_id) \(.msg)"' | tail`
-- [ ] Expect non-empty `trace_id` values on request-scoped log lines. Startup lines will still show empty — correct, there's no request in flight.
+- [x] Run: `make down && make up-obs`
+- [x] Run a transfer (steps 1–2 of the milestone overview's demo script).
+- [x] Run: `docker compose logs --no-log-prefix wallet-service | jq -r 'select(.trace_id != "") | "\(.trace_id) \(.msg)"' | tail`
+- [x] Expect non-empty `trace_id` values on request-scoped log lines. Startup lines will still show empty — correct, there's no request in flight.
 
 ## Step 5: Verify the span reaches Jaeger
 
-- [ ] Open `http://localhost:16686`, select service **`wallet-service`**, Find Traces.
-- [ ] Expect a trace with a `POST /transfers` server span.
-- [ ] If Task 03 is already merged, that same trace should also contain `ledger-service` spans — the traceparent from Step 2 is what links them. Confirm this if so; it is the first visible proof of cross-service correlation. (If Task 03 is not yet merged, a wallet-only trace is the correct result here.)
+- [x] Open `http://localhost:16686`, select service **`wallet-service`**, Find Traces.
+- [x] Expect a trace with a `POST /transfers` server span.
+- [x] If Task 03 is already merged, that same trace should also contain `ledger-service` spans — the traceparent from Step 2 is what links them. Confirm this if so; it is the first visible proof of cross-service correlation. (If Task 03 is not yet merged, a wallet-only trace is the correct result here.)
 
 ## Step 6: Full suite and commit
 
-- [ ] Run: `./mvnw verify` — expect the full unit + integration suite green (86 unit + 51 integration as of M4, plus the new test).
-- [ ] Commit:
+- [x] Run: `./mvnw verify` — expect the full unit + integration suite green (86 unit + 51 integration as of M4, plus the new test).
+- [x] Commit:
 
 ```bash
 git add services/wallet-service/src/main/resources/application.yml \
