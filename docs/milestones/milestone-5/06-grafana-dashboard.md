@@ -297,7 +297,7 @@ Check each one individually. A panel showing "No data" is a failed panel, not a 
 - [x] **Projection lag** — non-zero; sub-second on a healthy local stack.
 - [x] **Kafka consumer lag** — present, typically near 0.
 - [x] **Outbox depth** — present, typically 0 or a low number. To prove the panel is live rather than just flat: `docker compose -f docker-compose.yml -f docker-compose.observability.yml stop kafka`, run a few transfers, watch the line climb, then `start kafka` and watch it drain. This is also a preview of the §9.5 failure-mode demo.
-- [x] Screenshot the populated dashboard for `docs/results/` (see Task 07).
+- [ ] Screenshot the populated dashboard for `docs/results/` (see Task 07). **Deferred:** Task 07 was executed by an agent without browser/GUI access; no screenshot was captured and `docs/results/` does not exist in this repo. Equivalent verification value was captured via the Grafana HTTP API instead — see Task 07 Step 6's deferral note and Implementation Record, and the milestone overview's "Screenshots" note.
 
 ## Step 6: Commit
 
