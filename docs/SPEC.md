@@ -985,8 +985,7 @@ ledger-platform/
 │   ├── kafka/                      # topic creation scripts
 │   ├── observability/
 │   │   ├── prometheus.yml
-│   │   ├── grafana/
-│   │   └── otel-collector.yml
+│   │   └── grafana/
 │   └── load/                       # k6 scripts
 ├── docs/
 │   ├── architecture/

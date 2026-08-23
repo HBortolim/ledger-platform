@@ -1,6 +1,6 @@
 # ADR-0012: OpenTelemetry Collector trace pipeline
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0014
 **Date:** 2026-08-20
 
 ## Context

@@ -1,11 +1,15 @@
 services:
   jaeger:
-    image: jaegertracing/all-in-one:1.57
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
+    # Jaeger v2 (ADR-0014): a distribution of the OTel Collector core with
+    # Jaeger's storage/query/UI added, so it terminates OTLP natively --
+    # config-file-driven, not env-var-driven like v1. No config file is
+    # mounted here, so it runs in its default all-in-one mode (in-memory
+    # storage, OTLP receivers on 4317/4318, UI on 16686).
+    image: jaegertracing/jaeger:2.20.0
     ports:
-      # UI only. OTLP ingest happens over the compose network from the
-      # collector, so 4317/4318 deliberately are not published to the host.
+      # UI only. OTLP ingest happens over the compose network directly from
+      # the application services, so 4317/4318 deliberately are not
+      # published to the host.
       - "16686:16686"
 
   prometheus:
@@ -25,13 +29,3 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.101.0
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./infrastructure/observability/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro
-    ports:
-      - "8889:8889"   # prometheus exporter scrape target
-    depends_on:
-      - jaeger
