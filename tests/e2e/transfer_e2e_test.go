@@ -132,14 +132,9 @@ func TestE2E_InsufficientFunds(t *testing.T) {
 	assertLedgerEntryCount(t, source, 1) // only the seed deposit's CREDIT entry -- the rejected attempt wrote nothing
 }
 
-// TestE2E_TraceContextPropagatedToKafka guards NFR-OBS-2/NFR-OBS-5's async
-// propagation chain: the ledger.posted.v1 record produced for a transfer
-// must carry a well-formed W3C traceparent Kafka header (ADR-0013, the sole
-// propagation carrier). This runs against the core-only stack -- no
-// observability containers required -- because Task 01 sets
-// OTEL_EXPORTER_OTLP_ENDPOINT unconditionally in docker-compose.yml, so
-// spans are created and context injected even when the exporter can't reach
-// a collector.
+// TestE2E_TraceContextPropagatedToKafka asserts the ledger.posted.v1 record
+// produced for a transfer carries a well-formed W3C traceparent Kafka
+// header, and runs against the core-only stack.
 func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
 	userID := uuid.New()
 	token := signJWT(t, userID, "user")
@@ -162,10 +157,6 @@ func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
 
 	record := assertLedgerPostedObserved(t, transactionID)
 
-	// NFR-OBS-2: the Kafka hop must carry W3C trace context. Before M5 this
-	// header was hardcoded empty (posting.go's "wired in M5" placeholder), so
-	// an empty value here means the propagation chain has regressed and the
-	// end-to-end trace is silently broken in two.
 	var traceparent string
 	for _, h := range record.Headers {
 		if h.Key == "traceparent" {
@@ -179,8 +170,6 @@ func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
 		t.Errorf("traceparent = %q, want a well-formed W3C traceparent", traceparent)
 	}
 
-	// ADR-0013: the header is the sole propagation carrier -- the payload
-	// must not carry a traceparent field at all.
 	var payload map[string]any
 	if err := json.Unmarshal(record.Value, &payload); err != nil {
 		t.Fatalf("decode ledger.posted.v1 payload: %v", err)

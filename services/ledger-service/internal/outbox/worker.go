@@ -121,9 +121,6 @@ func (w *Worker) Poll(ctx context.Context) error {
 			continue
 		}
 
-		// Continue the trace that produced this row rather than starting a
-		// new one: the publish is logically part of that posting, even though
-		// it runs on this worker's goroutine much later.
 		rowCtx := otel.GetTextMapPropagator().Extract(ctx, headerCarrier(hdrs))
 		_, span := tracer.Start(rowCtx, "outbox publish",
 			trace.WithSpanKind(trace.SpanKindProducer),

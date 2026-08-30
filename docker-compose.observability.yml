@@ -2,9 +2,6 @@ services:
   jaeger:
     image: jaegertracing/jaeger:2.20.0
     ports:
-      # UI only. OTLP ingest happens over the compose network directly from
-      # the application services, so 4317/4318 deliberately are not
-      # published to the host.
       - "16686:16686"
 
   prometheus:

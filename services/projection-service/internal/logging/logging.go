@@ -14,9 +14,7 @@ import (
 )
 
 // traceHandler decorates every record with the trace and span IDs of the
-// active span in ctx. Until a tracer provider is installed (Task 03), the
-// span context is invalid and both fields render as empty strings — the same
-// thing the wallet-service emits today for an untraced request.
+// active span in ctx, rendering empty strings when there is none.
 type traceHandler struct {
 	slog.Handler
 }
@@ -39,9 +37,6 @@ func (h traceHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-// WithAttrs and WithGroup must re-wrap: the embedded handler's versions
-// return a bare slog.Handler, which would silently drop trace correlation
-// for any logger derived via With(...).
 func (h traceHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return traceHandler{h.Handler.WithAttrs(attrs)}
 }

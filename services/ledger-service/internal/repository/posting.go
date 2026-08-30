@@ -371,11 +371,6 @@ type entryPayload struct {
 }
 
 func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction) error {
-	// Capture the active trace context into the row. The worker publishes
-	// this asynchronously -- a tick later at best, after a Kafka outage at
-	// worst -- so there is no ambient context to read at publish time; it has
-	// to travel with the row. Empty when tracing is disabled, which is the
-	// pre-M5 behaviour and remains valid (ADR-0013).
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 

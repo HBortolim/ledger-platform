@@ -171,15 +171,10 @@ func TestConsumer_PoisonMessage_CountsAndContinues(t *testing.T) {
 	}
 }
 
-// TestConsumerJoinsProducerTrace proves the Kafka hop preserves trace context
-// (NFR-OBS-2): a record whose header carries a traceparent must be applied
-// inside a span belonging to that same trace, not a fresh root trace. This is
-// what makes NFR-OBS-5's end-to-end view possible.
+// TestConsumerJoinsProducerTrace asserts a record whose header carries a
+// traceparent is applied inside a span belonging to that same trace, not a
+// fresh root trace.
 func TestConsumerJoinsProducerTrace(t *testing.T) {
-	// Reuse this package's existing harness exactly as
-	// TestConsumer_AppliesLedgerPosted_ToWalletBalances does (Postgres +
-	// Kafka containers, migrations, a connected consumer). Do not stand up a
-	// second set of containers.
 	_, appDSN := setupProjectionDB(t)
 	bootstrap := setupKafka(t)
 	pool := connectPool(t, appDSN)
@@ -201,8 +196,6 @@ func TestConsumerJoinsProducerTrace(t *testing.T) {
 		{EntryID: uuid.New(), AccountID: wallet, EntryType: "CREDIT", Amount: "10.00"},
 	}
 
-	// Produce via the helper extended above, passing the traceparent as the
-	// final argument.
 	produceLedgerPosted(t, bootstrap, uuid.New(), time.Now().UTC(), entries, traceparent)
 
 	c := consumer.NewLedgerPostedConsumer(pool, &config.Config{

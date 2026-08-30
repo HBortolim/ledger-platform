@@ -16,10 +16,6 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHa
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// Tracing is scoped to the business endpoints. Health and metrics are
-	// polled continuously by infrastructure and are not worth spans; scoping
-	// by route group avoids depending on otelgin's filter-option API, which
-	// has moved between versions.
 	traced := r.Group("", otelgin.Middleware("ledger-service"))
 
 	v1 := traced.Group("/ledger")

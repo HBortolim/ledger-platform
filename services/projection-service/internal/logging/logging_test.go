@@ -66,8 +66,6 @@ func TestUntracedContextYieldsEmptyTraceFields(t *testing.T) {
 	}
 }
 
-// Derived loggers must keep trace correlation: a bare embedded WithAttrs
-// would return the undecorated handler and silently drop trace_id/span_id.
 func TestDerivedLoggerKeepsTraceFields(t *testing.T) {
 	var buf bytes.Buffer
 	logger := newTestLogger(&buf, "projection-service").With(slog.String("component", "outbox"))

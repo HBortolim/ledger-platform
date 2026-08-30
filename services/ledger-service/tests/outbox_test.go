@@ -112,11 +112,8 @@ func TestOutboxWorker_PublishesToKafka(t *testing.T) {
 	}
 }
 
-// TestOutboxRowCarriesTraceparent proves the M2 placeholder is gone: a posting
-// made inside an active span must persist that span's W3C trace context into
-// the outbox row's headers column. Without this, the ledger->projection half
-// of NFR-OBS-5's end-to-end trace cannot exist -- Kafka is the only path
-// between them.
+// TestOutboxRowCarriesTraceparent asserts a posting made inside an active
+// span persists that span's W3C trace context into the outbox row's headers.
 func TestOutboxRowCarriesTraceparent(t *testing.T) {
 	_, appDSN := setupLedgerDB(t)
 	ctx := context.Background()
@@ -171,8 +168,6 @@ func TestOutboxRowCarriesTraceparent(t *testing.T) {
 		t.Errorf("traceparent = %q, want it to carry the originating trace ID %s", traceparent, wantTraceID)
 	}
 
-	// The header is the sole propagation carrier -- the payload must not
-	// carry a traceparent field at all.
 	var payload map[string]any
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
 		t.Fatalf("unmarshal payload: %v", err)
