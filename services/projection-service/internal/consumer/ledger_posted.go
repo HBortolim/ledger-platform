@@ -2,19 +2,49 @@ package consumer
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/metrics"
 )
 
 const ledgerPostedTopic = "ledger.posted.v1"
+
+var tracer = otel.Tracer("github.com/ledger-platform/projection-service/internal/consumer")
+
+// recordCarrier adapts a consumed record's headers to OTel's TextMapCarrier.
+// Extract-only; Set is a no-op.
+type recordCarrier []kgo.RecordHeader
+
+func (c recordCarrier) Get(key string) string {
+	for _, h := range c {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c recordCarrier) Set(string, string) {}
+
+func (c recordCarrier) Keys() []string {
+	keys := make([]string, len(c))
+	for i, h := range c {
+		keys[i] = h.Key
+	}
+	return keys
+}
 
 // LedgerPostedConsumer drains ledger.posted.v1 into projection_db.wallet_balances.
 // Kafka offsets are committed only after the corresponding DB transaction
@@ -68,11 +98,12 @@ func (c *LedgerPostedConsumer) Close() {
 // cancelled.
 func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 	if err := c.Connect(); err != nil {
-		log.Fatalf("projection consumer: cannot create kafka client: %v", err)
+		slog.ErrorContext(ctx, "projection consumer: cannot create kafka client", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer c.Close()
 
-	log.Println("projection consumer started")
+	slog.InfoContext(ctx, "projection consumer started")
 	for {
 		select {
 		case <-ctx.Done():
@@ -80,7 +111,7 @@ func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 		default:
 		}
 		if err := c.Tick(ctx); err != nil {
-			log.Printf("projection consumer: tick error: %v", err)
+			slog.ErrorContext(ctx, "projection consumer: tick failed", slog.Any("error", err))
 		}
 	}
 }
@@ -96,7 +127,8 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 	}
 
 	fetches.EachError(func(topic string, partition int32, err error) {
-		log.Printf("projection consumer: fetch error topic=%s partition=%d: %v", topic, partition, err)
+		slog.ErrorContext(ctx, "projection consumer: fetch error",
+			slog.String("topic", topic), slog.Int("partition", int(partition)), slog.Any("error", err))
 	})
 
 	fetches.EachRecord(func(r *kgo.Record) {
@@ -111,21 +143,45 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 // database being down) leaves the offset uncommitted so the record is
 // redelivered on the next tick (§9.9).
 func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
+	ctx = otel.GetTextMapPropagator().Extract(ctx, recordCarrier(r.Headers))
+	ctx, span := tracer.Start(ctx, "projection apply",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.source.name", r.Topic),
+			attribute.Int64("messaging.kafka.message.offset", r.Offset),
+		))
+	defer span.End()
+
 	event, err := decodeLedgerPostedEvent(r.Value)
 	if err != nil {
-		log.Printf("projection consumer: poison message at %s[%d]@%d: %v", r.Topic, r.Partition, r.Offset, err)
+		slog.ErrorContext(ctx, "projection consumer: poison message",
+			slog.String("topic", r.Topic),
+			slog.Int("partition", int(r.Partition)),
+			slog.Int64("offset", r.Offset),
+			slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "poison message")
 		metrics.EventsProcessedTotal.WithLabelValues("error").Inc()
 		if err := c.client.CommitRecords(ctx, r); err != nil {
-			log.Printf("projection consumer: commit past poison message: %v", err)
+			slog.ErrorContext(ctx, "projection consumer: commit past poison message failed", slog.Any("error", err))
 		}
 		return
 	}
 
 	result, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
 	if err != nil {
-		log.Printf("projection consumer: apply transaction %s failed, will retry: %v", event.TransactionID, err)
+		slog.ErrorContext(ctx, "projection consumer: apply failed, will retry",
+			slog.String("transaction_id", event.TransactionID.String()),
+			slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "apply failed")
 		return
 	}
+	slog.InfoContext(ctx, "projection consumer: apply succeeded",
+		slog.String("transaction_id", event.TransactionID.String()),
+		slog.String("result", result),
+		slog.Int64("offset", r.Offset))
 	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
 
 	lag := max(time.Since(event.OccurredAt).Seconds(), 0)
@@ -136,7 +192,9 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 	// (notification-service is optional and unbuilt per SPEC.md §5.2).
 
 	if err := c.client.CommitRecords(ctx, r); err != nil {
-		log.Printf("projection consumer: commit offset for %s: %v", event.TransactionID, err)
+		slog.ErrorContext(ctx, "projection consumer: commit offset failed",
+			slog.String("transaction_id", event.TransactionID.String()),
+			slog.Any("error", err))
 		return
 	}
 

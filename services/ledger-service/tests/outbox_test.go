@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/ledger-platform/ledger-service/internal/metrics"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
@@ -104,6 +109,71 @@ func TestOutboxWorker_PublishesToKafka(t *testing.T) {
 	}
 	if len(envelope.Entries) != 2 {
 		t.Errorf("kafka message entries = %d, want 2", len(envelope.Entries))
+	}
+}
+
+// TestOutboxRowCarriesTraceparent asserts a posting made inside an active
+// span persists that span's W3C trace context into the outbox row's headers.
+func TestOutboxRowCarriesTraceparent(t *testing.T) {
+	_, appDSN := setupLedgerDB(t)
+	ctx := context.Background()
+
+	pool, err := pgxpool.New(ctx, appDSN)
+	if err != nil {
+		t.Fatalf("pgxpool.New() = error %v, want nil", err)
+	}
+	t.Cleanup(pool.Close)
+
+	// A provider with no exporter still produces real, sampled span contexts,
+	// which is all injection needs.
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	repo := repository.NewPostingRepository(pool, testDailyCap, systemFundingAccountID)
+
+	spanCtx, span := tp.Tracer("test").Start(ctx, "posting request")
+	wantTraceID := span.SpanContext().TraceID().String()
+
+	source, dest := uuid.New(), uuid.New()
+	seedAccountBalance(t, pool, source, "500.00")
+	tx := newBalancedTransfer(source, dest, "100.00")
+	if err := repo.Post(spanCtx, tx); err != nil {
+		t.Fatalf("Post() = error %v, want nil", err)
+	}
+	span.End()
+
+	var headersJSON, payloadJSON []byte
+	err = pool.QueryRow(ctx,
+		`SELECT headers, payload FROM ledger_db.outbox WHERE key = $1`, tx.ID.String(),
+	).Scan(&headersJSON, &payloadJSON)
+	if err != nil {
+		t.Fatalf("query outbox row: %v", err)
+	}
+
+	var headers map[string]string
+	if err := json.Unmarshal(headersJSON, &headers); err != nil {
+		t.Fatalf("unmarshal headers: %v", err)
+	}
+	traceparent := headers["traceparent"]
+	if traceparent == "" {
+		t.Fatal("outbox headers carry no traceparent; the M2 placeholder is still in place")
+	}
+	// W3C format: 00-<32 hex trace>-<16 hex span>-<2 hex flags>
+	if !regexp.MustCompile(`^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$`).MatchString(traceparent) {
+		t.Errorf("traceparent = %q, want a well-formed W3C traceparent", traceparent)
+	}
+	if !strings.Contains(traceparent, wantTraceID) {
+		t.Errorf("traceparent = %q, want it to carry the originating trace ID %s", traceparent, wantTraceID)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if _, ok := payload["traceparent"]; ok {
+		t.Error("payload carries a traceparent field; propagation must be header-only")
 	}
 }
 

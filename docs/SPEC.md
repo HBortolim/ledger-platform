@@ -618,8 +618,7 @@ Consumed by: Projection Service, Notification Service
   "entries": [
     {"entryId": "uuid", "accountId": "uuid", "entryType": "DEBIT",  "amount": "100.00"},
     {"entryId": "uuid", "accountId": "uuid", "entryType": "CREDIT", "amount": "100.00"}
-  ],
-  "traceparent": "00-<trace>-<span>-01"
+  ]
 }
 ```
 
@@ -985,8 +984,7 @@ ledger-platform/
 │   ├── kafka/                      # topic creation scripts
 │   ├── observability/
 │   │   ├── prometheus.yml
-│   │   ├── grafana/
-│   │   └── otel-collector.yml
+│   │   └── grafana/
 │   └── load/                       # k6 scripts
 ├── docs/
 │   ├── architecture/

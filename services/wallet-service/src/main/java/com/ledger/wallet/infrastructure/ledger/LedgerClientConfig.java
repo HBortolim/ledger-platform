@@ -17,15 +17,21 @@ public class LedgerClientConfig {
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
     @Bean
-    public RestClient ledgerRestClient(LedgerServiceProperties props) {
-        return buildRestClient(props.url(), CONNECT_TIMEOUT, READ_TIMEOUT);
+    public RestClient ledgerRestClient(RestClient.Builder builder, LedgerServiceProperties props) {
+        return builder
+                .baseUrl(props.url())
+                .requestFactory(jdkRequestFactory(CONNECT_TIMEOUT, READ_TIMEOUT))
+                .build();
     }
 
-    /**
-     * Package-visible so tests can build a client against a WireMock server
-     * with short timeouts, without duplicating the request-factory wiring.
-     */
-     static RestClient buildRestClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+    static RestClient buildRestClient(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(jdkRequestFactory(connectTimeout, readTimeout))
+                .build();
+    }
+
+    private static JdkClientHttpRequestFactory jdkRequestFactory(Duration connectTimeout, Duration readTimeout) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(connectTimeout)
                 // The Ledger Service (Go/Gin's net/http) speaks plain HTTP/1.1 only.
@@ -35,10 +41,6 @@ public class LedgerClientConfig {
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(readTimeout);
-
-        return RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(requestFactory)
-                .build();
+        return requestFactory;
     }
 }

@@ -175,7 +175,7 @@ type entryFixture struct {
 // services/ledger-service/internal/repository/posting.go, ledgerPostedPayload).
 // Producing directly, rather than routing through a real ledger-service
 // instance, keeps this suite independent of ledger internals.
-func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID, occurredAt time.Time, entries []entryFixture) {
+func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID, occurredAt time.Time, entries []entryFixture, traceparent string) {
 	t.Helper()
 
 	type entryPayload struct {
@@ -192,7 +192,6 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 		TransactionID   uuid.UUID      `json:"transactionId"`
 		TransactionType string         `json:"transactionType"`
 		Entries         []entryPayload `json:"entries"`
-		Traceparent     string         `json:"traceparent"`
 	}
 
 	eps := make([]entryPayload, len(entries))
@@ -218,12 +217,18 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 	}
 	defer producer.Close()
 
+	var hdrs []kgo.RecordHeader
+	if traceparent != "" {
+		hdrs = []kgo.RecordHeader{{Key: "traceparent", Value: []byte(traceparent)}}
+	}
+
 	produceCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	res := producer.ProduceSync(produceCtx, &kgo.Record{
-		Topic: "ledger.posted.v1",
-		Key:   []byte(transactionID.String()),
-		Value: body,
+		Topic:   "ledger.posted.v1",
+		Key:     []byte(transactionID.String()),
+		Value:   body,
+		Headers: hdrs,
 	})
 	if err := res.FirstErr(); err != nil {
 		t.Fatalf("produce ledger posted message: %v", err)

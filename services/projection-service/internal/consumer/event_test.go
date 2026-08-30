@@ -17,8 +17,7 @@ func TestDecodeLedgerPostedEvent_ValidPayload(t *testing.T) {
 		"entries": [
 			{"entryId":"11111111-1111-1111-1111-111111111111","accountId":"22222222-2222-2222-2222-222222222222","entryType":"DEBIT","amount":"100.00"},
 			{"entryId":"33333333-3333-3333-3333-333333333333","accountId":"44444444-4444-4444-4444-444444444444","entryType":"CREDIT","amount":"100.00"}
-		],
-		"traceparent": ""
+		]
 	}`)
 
 	event, err := decodeLedgerPostedEvent(payload)

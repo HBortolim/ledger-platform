@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -15,23 +16,42 @@ import (
 
 	"github.com/ledger-platform/ledger-service/internal/config"
 	"github.com/ledger-platform/ledger-service/internal/handler"
+	"github.com/ledger-platform/ledger-service/internal/logging"
+	"github.com/ledger-platform/ledger-service/internal/observability"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
 	"github.com/ledger-platform/ledger-service/internal/repository"
 	"github.com/ledger-platform/ledger-service/internal/service"
 )
 
 func main() {
+	logging.Setup("ledger-service")
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	shutdownTracing, err := observability.SetupTracing(ctx, "ledger-service")
+	if err != nil {
+		slog.Error("cannot initialise tracing", slog.Any("error", err))
+		os.Exit(1)
+	}
+	defer func() {
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer flushCancel()
+		if err := shutdownTracing(flushCtx); err != nil {
+			slog.Error("tracing shutdown error", slog.Any("error", err))
+		}
+	}()
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("cannot connect to database: %v", err)
+		slog.Error("cannot connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer pool.Close()
 
@@ -42,13 +62,14 @@ func main() {
 		kgo.AllowIdempotentProduceCancellation(),
 	)
 	if err != nil {
-		log.Fatalf("cannot create kafka producer: %v", err)
+		slog.Error("cannot create kafka producer", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer func() {
 		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer flushCancel()
 		if err := producer.Flush(flushCtx); err != nil {
-			log.Printf("kafka flush error: %v", err)
+			slog.ErrorContext(flushCtx, "kafka flush error", slog.Any("error", err))
 		}
 		producer.Close()
 	}()
@@ -84,10 +105,10 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown error: %v", err)
+		slog.ErrorContext(shutdownCtx, "shutdown error", slog.Any("error", err))
 	}
 
 	if err := g.Wait(); err != nil {
-		log.Printf("worker group error: %v", err)
+		slog.ErrorContext(shutdownCtx, "worker group error", slog.Any("error", err))
 	}
 }

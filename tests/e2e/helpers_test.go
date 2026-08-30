@@ -237,8 +237,10 @@ func assertLedgerEntriesForTransaction(t *testing.T, transactionID uuid.UUID, wa
 
 // assertLedgerPostedObserved consumes ledger.posted.v1 from the start with a
 // fresh consumer group (so it always sees the whole topic history) until it
-// finds an event for transactionID or a 10s deadline elapses.
-func assertLedgerPostedObserved(t *testing.T, transactionID uuid.UUID) {
+// finds an event for transactionID or a 10s deadline elapses. Returns the
+// matching record so callers can inspect its headers (e.g. NFR-OBS-2's
+// traceparent propagation check).
+func assertLedgerPostedObserved(t *testing.T, transactionID uuid.UUID) *kgo.Record {
 	t.Helper()
 	cl, err := kgo.NewClient(
 		kgo.SeedBrokers(kafkaBroker),
@@ -259,17 +261,17 @@ func assertLedgerPostedObserved(t *testing.T, transactionID uuid.UUID) {
 		if ctx.Err() != nil {
 			t.Fatalf("timed out waiting for LEDGER_POSTED for transaction %s on %s", transactionID, ledgerTopic)
 		}
-		found := false
+		var match *kgo.Record
 		fetches.EachRecord(func(r *kgo.Record) {
 			var event struct {
 				TransactionID string `json:"transactionId"`
 			}
 			if err := json.Unmarshal(r.Value, &event); err == nil && event.TransactionID == transactionID.String() {
-				found = true
+				match = r
 			}
 		})
-		if found {
-			return
+		if match != nil {
+			return match
 		}
 	}
 }

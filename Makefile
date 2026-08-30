@@ -1,10 +1,18 @@
-.PHONY: up down build test test-e2e load clean lint fmt
+.PHONY: up down up-obs down-obs build test test-e2e load clean lint fmt
 
 up:
 	docker compose up --build -d
 
 down:
 	docker compose down -v
+
+COMPOSE_OBS := -f docker-compose.yml -f docker-compose.observability.yml
+
+up-obs:
+	docker compose $(COMPOSE_OBS) up --build -d
+
+down-obs:
+	docker compose $(COMPOSE_OBS) down -v
 
 build:
 	$(MAKE) -C services/wallet-service build

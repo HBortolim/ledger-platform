@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ledger-platform/ledger-service/internal/metrics"
 )
@@ -20,6 +24,8 @@ const (
 	batchSize         = 100
 	produceTimeout    = 5 * time.Second
 )
+
+var tracer = otel.Tracer("github.com/ledger-platform/ledger-service/internal/outbox")
 
 // Worker drains ledger_db.outbox rows to Kafka: exactly-once from the
 // database's perspective, at-least-once from the consumer's.
@@ -47,12 +53,12 @@ func (w *Worker) Run(ctx context.Context) error {
 			return nil
 		case <-pollTicker.C:
 			if err := w.Poll(ctx); err != nil {
-				log.Printf("outbox poll error: %v", err)
+				slog.ErrorContext(ctx, "outbox poll failed", slog.Any("error", err))
 			}
 			w.reportDepth(ctx)
 		case <-retentionTicker.C:
 			if err := w.Sweep(ctx); err != nil {
-				log.Printf("outbox retention sweep error: %v", err)
+				slog.ErrorContext(ctx, "outbox retention sweep failed", slog.Any("error", err))
 			}
 		}
 	}
@@ -105,13 +111,25 @@ func (w *Worker) Poll(ctx context.Context) error {
 
 	records := make([]*kgo.Record, 0, len(batch))
 	produced := make([]outboxRow, 0, len(batch))
+	spans := make([]trace.Span, 0, len(batch))
 	for _, r := range batch {
 		hdrs, err := decodeHeaders(r.headers)
 		if err != nil {
 			metrics.OutboxPublishFailures.WithLabelValues("serialization").Inc()
-			log.Printf("outbox row %d: decode headers: %v", r.id, err)
+			slog.ErrorContext(ctx, "outbox row: decode headers failed",
+				slog.Int64("outbox_id", r.id), slog.Any("error", err))
 			continue
 		}
+
+		rowCtx := otel.GetTextMapPropagator().Extract(ctx, headerCarrier(hdrs))
+		_, span := tracer.Start(rowCtx, "outbox publish",
+			trace.WithSpanKind(trace.SpanKindProducer),
+			trace.WithAttributes(
+				attribute.String("messaging.system", "kafka"),
+				attribute.String("messaging.destination.name", r.topic),
+				attribute.Int64("outbox.row_id", r.id),
+			))
+
 		records = append(records, &kgo.Record{
 			Topic:   r.topic,
 			Key:     []byte(r.key),
@@ -119,6 +137,7 @@ func (w *Worker) Poll(ctx context.Context) error {
 			Headers: hdrs,
 		})
 		produced = append(produced, r)
+		spans = append(spans, span)
 	}
 
 	if len(records) == 0 {
@@ -137,9 +156,14 @@ func (w *Worker) Poll(ctx context.Context) error {
 	for i, res := range results {
 		if res.Err != nil {
 			metrics.OutboxPublishFailures.WithLabelValues(classifyProduceErr(res.Err)).Inc()
-			log.Printf("outbox row %d: produce failed: %v", produced[i].id, res.Err)
+			slog.ErrorContext(ctx, "outbox row: produce failed",
+				slog.Int64("outbox_id", produced[i].id), slog.Any("error", res.Err))
+			spans[i].RecordError(res.Err)
+			spans[i].SetStatus(codes.Error, "produce failed")
+			spans[i].End()
 			continue
 		}
+		spans[i].End()
 		published = append(published, produced[i].id)
 	}
 
@@ -166,7 +190,7 @@ func (w *Worker) Sweep(ctx context.Context) error {
 		return fmt.Errorf("outbox retention sweep: %w", err)
 	}
 	if n := tag.RowsAffected(); n > 0 {
-		log.Printf("outbox retention sweep: deleted %d rows", n)
+		slog.InfoContext(ctx, "outbox retention sweep completed", slog.Int64("deleted_rows", n))
 	}
 	return nil
 }
@@ -177,7 +201,7 @@ func (w *Worker) reportDepth(ctx context.Context) {
 		`SELECT count(*) FROM ledger_db.outbox WHERE published_at IS NULL`,
 	).Scan(&depth)
 	if err != nil {
-		log.Printf("outbox depth query error: %v", err)
+		slog.ErrorContext(ctx, "outbox depth query failed", slog.Any("error", err))
 		return
 	}
 	metrics.OutboxDepth.Set(depth)

@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -129,4 +130,51 @@ func TestE2E_InsufficientFunds(t *testing.T) {
 	}
 
 	assertLedgerEntryCount(t, source, 1) // only the seed deposit's CREDIT entry -- the rejected attempt wrote nothing
+}
+
+// TestE2E_TraceContextPropagatedToKafka asserts the ledger.posted.v1 record
+// produced for a transfer carries a well-formed W3C traceparent Kafka
+// header, and runs against the core-only stack.
+func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
+	userID := uuid.New()
+	token := signJWT(t, userID, "user")
+	source := newWallet(t, token, userID)
+	destination := newWallet(t, token, uuid.New())
+	seedDeposit(t, source, "500.00")
+
+	key := uuid.New().String()
+	resp, body := postTransfer(t, token, key, source, destination, "100.00")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /transfers = %d, want 201; body: %s", resp.StatusCode, body)
+	}
+	var created struct {
+		TransferID string `json:"transferId"`
+	}
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatalf("decode transfer response: %v", err)
+	}
+	transactionID := uuid.MustParse(created.TransferID)
+
+	record := assertLedgerPostedObserved(t, transactionID)
+
+	var traceparent string
+	for _, h := range record.Headers {
+		if h.Key == "traceparent" {
+			traceparent = string(h.Value)
+		}
+	}
+	if traceparent == "" {
+		t.Fatal("ledger.posted.v1 record carries no traceparent header (NFR-OBS-2)")
+	}
+	if !regexp.MustCompile(`^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$`).MatchString(traceparent) {
+		t.Errorf("traceparent = %q, want a well-formed W3C traceparent", traceparent)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(record.Value, &payload); err != nil {
+		t.Fatalf("decode ledger.posted.v1 payload: %v", err)
+	}
+	if _, ok := payload["traceparent"]; ok {
+		t.Error("payload carries a traceparent field; propagation must be header-only")
+	}
 }

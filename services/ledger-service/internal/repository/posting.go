@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/shopspring/decimal"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const pgErrUniqueViolation = "23505"
@@ -359,7 +361,6 @@ type ledgerPostedPayload struct {
 	TransactionID   uuid.UUID      `json:"transactionId"`
 	TransactionType string         `json:"transactionType"`
 	Entries         []entryPayload `json:"entries"`
-	Traceparent     string         `json:"traceparent"` // wired in M5; placeholder for now
 }
 
 type entryPayload struct {
@@ -370,6 +371,9 @@ type entryPayload struct {
 }
 
 func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction) error {
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
 	eps := make([]entryPayload, len(t.Entries))
 	for i, e := range t.Entries {
 		eps[i] = entryPayload{
@@ -387,13 +391,12 @@ func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction)
 		TransactionID:   t.ID,
 		TransactionType: string(t.Type),
 		Entries:         eps,
-		Traceparent:     "",
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal outbox payload: %w", err)
 	}
-	headersJSON, err := json.Marshal(map[string]string{"traceparent": ""})
+	headersJSON, err := json.Marshal(map[string]string(carrier))
 	if err != nil {
 		return fmt.Errorf("marshal outbox headers: %w", err)
 	}

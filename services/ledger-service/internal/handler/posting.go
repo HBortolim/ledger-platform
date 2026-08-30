@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -104,6 +105,10 @@ func (h *PostingHandler) PostPosting(c *gin.Context) {
 		h.renderPostError(c, err)
 		return
 	}
+
+	slog.InfoContext(c.Request.Context(), "posting created",
+		slog.String("transaction_id", tx.ID.String()),
+		slog.String("type", string(tx.Type)))
 
 	c.JSON(http.StatusCreated, renderPosting(tx))
 }
