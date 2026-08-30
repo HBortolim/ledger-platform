@@ -339,9 +339,6 @@ class TransferControllerIT extends BaseIntegrationTest {
                         .content(transferBody(source, destination, "100.00")))
                 .andExpect(status().isCreated());
 
-        // NFR-OBS-2: W3C traceparent, format 00-<32 hex trace>-<16 hex span>-<2 hex flags>.
-        // Guards the RestClient.builder() trap: the static factory produces an
-        // uninstrumented client that sends no traceparent at all.
         LEDGER.verify(postRequestedFor(urlEqualTo("/ledger/postings"))
                 .withHeader("traceparent", matching("^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$")));
     }
