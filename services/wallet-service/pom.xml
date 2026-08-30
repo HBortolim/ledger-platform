@@ -100,13 +100,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-opentelemetry</artifactId>
         </dependency>
-        <!-- Provides RestClientAutoConfiguration/RestClientObservationAutoConfiguration:
-             the auto-configured, observation-instrumented RestClient.Builder bean that
-             LedgerClientConfig.ledgerRestClient builds from (see the trap note there),
-             and, for tests, RestTemplateBuilder required by spring-boot-resttestclient's
-             TestRestTemplateTestAutoConfiguration for @AutoConfigureTestRestTemplate.
-             Main scope: without it the RestClient.Builder bean does not exist at all
-             and the app fails to start. -->
+        
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-restclient</artifactId>
