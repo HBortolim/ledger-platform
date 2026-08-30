@@ -52,7 +52,7 @@ A large part of the "schema" bullet in `SPEC.md` §11 is **already done**. Do no
 | 1 | Add a restricted **`ledger_app`** login role (no `UPDATE`/`DELETE` on the immutable ledger tables) and connect the ledger-service as it. | Makes append-only a real DB-enforced guarantee, not a convention; TST-INT-6 becomes meaningful end-to-end. | `SPEC.md` NFR-AUDIT-1, §6.2; Task 02 |
 | 2 | Kafka client: **`twmb/franz-go`**. | Pure Go, CGO-free — preserves the `CGO_ENABLED=0` Dockerfile build. | Task 05 |
 | 3 | Go integration tests use **`testcontainers-go`**. | Consistency with the wallet-service's Testcontainers; active maintenance. Intentionally diverges from `SPEC.md` §10.2's literal "dockertest". | Task 07 |
-| 4 | Include the **`SELECT ... FOR UPDATE` available-balance check** + `account_balances_locked` update inside the M2 posting. | Pulls part of M4 forward so the posting is correct under contention from day one. Daily-cap stays in the Wallet Service per the §5.2 ownership map and is **out of scope** here. | `SPEC.md` §8 (steps 7–8), ADR-002; Task 03/04 |
+| 4 | Include the **`SELECT ... FOR UPDATE` available-balance check** + `account_balances_locked` update inside the M2 posting. | Pulls part of M4 forward so the posting is correct under contention from day one. Daily-cap stays in the Wallet Service per the §5.2 ownership map and is **out of scope** here. *(Superseded by ADR-0011 — the daily cap later moved into the Ledger Service's locked transaction.)* | `SPEC.md` §8 (steps 7–8), ADR-002; Task 03/04 |
 
 ### New ADRs to write during M2
 

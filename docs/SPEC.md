@@ -78,7 +78,7 @@ This invariant is enforced in **three** places — defense in depth:
 
 1. **Application code** in the Ledger Service before opening the DB transaction.
 2. **A trigger or check constraint** on `ledger_transactions` that runs at commit time.
-3. **A reconciliation job** (§7.5) that scans historical transactions and alerts on any imbalance.
+3. **A reconciliation job** (§7.6) that scans historical transactions and alerts on any imbalance.
 
 If any of these three ever fires, it is a P0 incident in the simulated operational model.
 
@@ -258,7 +258,7 @@ Each NFR has a metric, a target, and how it's measured. "Should be fast" is not 
 |---|---|
 | NFR-OBS-1 | Logs are structured JSON, written to stdout, include `trace_id`, `span_id`, `service`, `level`, `msg`. |
 | NFR-OBS-2 | Every request carries a `trace_id` propagated via W3C `traceparent` header across HTTP and as a Kafka header across events. |
-| NFR-OBS-3 | Each service exposes `/metrics` in Prometheus format. Required metrics per service listed in §7.3. |
+| NFR-OBS-3 | Each service exposes `/metrics` in Prometheus format. Required metrics per service listed in §7.4. |
 | NFR-OBS-4 | The Grafana dashboard `Transfers Overview` shows: transfer RPS, p50/p95/p99 latency, error rate by code, projection lag, Kafka consumer lag, outbox depth. |
 | NFR-OBS-5 | A single transfer can be traced end-to-end in Jaeger from `POST /transfers` through to the projection write. |
 
@@ -330,7 +330,7 @@ A responsibility belongs to one service. Everything else is either *delegated to
 | Idempotency lifecycle (records, fingerprints, TTL) | Projection updates |
 | Wallet lifecycle (create, freeze, unfreeze, close) | Money movement (delegated to Ledger) |
 | Wallet audit log | The double-entry invariant (defended by Ledger) |
-| Business rules that don't require ledger state (daily caps, self-transfer check, currency match) | |
+| Business rules that don't require ledger state (self-transfer check, currency match) | |
 | Generating deterministic `transactionId` from idempotency key | |
 | Translating Ledger Service responses into HTTP responses | |
 
@@ -348,6 +348,7 @@ A responsibility belongs to one service. Everything else is either *delegated to
 | Double-entry invariant enforcement (app code + DB trigger) | Idempotency at the HTTP-key level |
 | Atomic posting (entries + outbox row in one DB transaction) | Balance projections |
 | Available-balance check via account-lock row | Knowing *why* a transfer is happening |
+| Daily per-wallet transfer cap enforcement (same locked transaction as the balance check) | |
 | Outbox table writes | Event delivery to consumers (worker handles that) |
 | Account lock rows (`SELECT ... FOR UPDATE` target) | |
 | Deterministic rejection of unbalanced postings | |
@@ -409,6 +410,7 @@ When you're not sure where a piece of logic belongs, this table is the tiebreake
 | "Has this idempotency key been seen?" | Wallet Service | Public API concern |
 | "Does this posting balance to zero?" | Ledger Service | Accounting invariant |
 | "Does the source wallet have enough?" | Ledger Service | Requires lock-protected read of ledger state |
+| "Is this transfer within the daily cap?" | Ledger Service | Requires lock-protected read of ledger state, same as the balance check |
 | "What is wallet X's current balance?" | Projection Service (data) → Wallet Service (delivery) | Read model + auth |
 | "Has this Kafka event already been applied?" | Projection Service | Local idempotency on `last_entry_id` |
 | "Did the outbox publish reliably?" | Outbox Worker | Owns the publish lifecycle |
@@ -421,7 +423,7 @@ If a future requirement doesn't fit any row above, that's a signal a new respons
 - **Java + Spring Boot for the Wallet Service:** the Wallet Service is mostly orchestration, validation, and HTTP. Spring's ecosystem (Spring Security for JWT, Spring Data JDBC, Bean Validation) accelerates this kind of work.
 - **Go for the Ledger and Projection services:** these are simpler in shape but performance-sensitive and high-concurrency. Go's runtime and goroutine model fit the workload, and Go's strictness about errors maps well to financial logic where every error must be handled.
 - **Postgres for everything:** transactional guarantees, mature, well-understood. No reason to introduce another store in v1.
-- **Kafka for events:** durable, replayable, partition-ordered. The replay capability is specifically what we need for projection rebuilds (§7.5).
+- **Kafka for events:** durable, replayable, partition-ordered. The replay capability is specifically what we need for projection rebuilds (§7.6).
 
 ### 5.4 Database topology
 
@@ -591,12 +593,44 @@ Responses:
 
 - `201` — posted. Body includes `postedAt` and the persisted entry IDs.
 - `409` — `transactionId` already exists. Body includes the original posting for client comparison.
-- `422` — invariant violation, insufficient balance, invalid account. Body includes `code` and `message`.
+- `422` — invariant violation, insufficient balance, daily cap exceeded, invalid account. Body includes `code` and `message`.
 - `503` — DB unavailable.
 
 The `transactionId` is generated by the **Wallet Service** and passed in. This makes the call idempotent at the Ledger layer for free: a retry with the same ID either hits the existing record (409) or — if the original never committed — creates it fresh.
 
-### 7.2 Event schemas
+### 7.2 Projection Service API
+
+`GET /projections/wallets/{walletId}`
+
+Read-only. Called by the Wallet Service to fulfill `GET /wallets/{walletId}/balance` (FR-2). Not exposed to API clients directly — per §5.2's ownership table, the Projection Service owns the balance *data*, the Wallet Service owns *delivery* (auth, staleness policy, response shape).
+
+Response body:
+
+```json
+{
+  "walletId": "uuid",
+  "balance": "1100.00",
+  "lastEntryId": "uuid",
+  "lastAppliedAt": "2026-05-19T14:23:00.456Z",
+  "updatedAt": "2026-05-19T14:23:00.500Z"
+}
+```
+
+Fields map directly to `wallet_balances` (§6.3).
+
+Responses:
+
+- `200` — projection exists. Body as above.
+- `404` — no projection row for this wallet ID yet (see note below).
+- `503` — DB unavailable.
+
+**Freshness is the Wallet Service's decision, not the Projection Service's.** This endpoint returns `lastAppliedAt` as a raw fact. The Wallet Service compares it against NFR-CONS-2's threshold (p95 lag < 2s) and sets `"stale": true` on its client-facing response (AC-2.4) if the gap is too large. The Projection Service does not know or care what "stale" means to a caller — same separation of policy from fact as the Ledger Service applies to idempotency (§5.2).
+
+**New wallet, no projection row yet:** `POST /wallets` creates a wallet with balance `0.00` (AC-1.5), but the Projection Service only writes a `wallet_balances` row when it applies the first `LEDGER_POSTED` event for that wallet. Until then, this endpoint returns `404` for a legitimately-zero-balance wallet. The Wallet Service MUST translate a `404` here into `balance: 0.00` on its own response, not propagate a 404 to the client — a wallet with no transactions has a known balance of zero, not an unknown one.
+
+Unlike §7.1, this is a read path over derived, eventually-consistent state, not a write path that mutates authoritative state — so there is no idempotency-key or transactionId concept here.
+
+### 7.3 Event schemas
 
 All events are JSON, schema versioned via a `schemaVersion` field. Kafka key is the wallet ID for entries that pertain to a specific wallet, the transaction ID otherwise. Partitioning by wallet ID ensures all events for one wallet land on the same partition and are processed in order.
 
@@ -640,7 +674,7 @@ Consumed by: Notification Service
 }
 ```
 
-### 7.3 Required metrics
+### 7.4 Required metrics
 
 | Service | Metric | Type | Labels |
 |---|---|---|---|
@@ -657,7 +691,7 @@ Consumed by: Notification Service
 
 Note on cardinality: `projection_lag_seconds` per wallet would explode. Track it as a histogram across all wallets and a separate `max_projection_lag_seconds` gauge.
 
-### 7.4 Outbox worker behavior
+### 7.5 Outbox worker behavior
 
 Polling loop in the Ledger Service:
 
@@ -669,7 +703,7 @@ Polling loop in the Ledger Service:
 
 Ordering: within a partition, Kafka preserves order. Since key is `transactionId` or `walletId`, ordering is preserved per wallet — which is what matters.
 
-### 7.5 Reconciliation job
+### 7.6 Reconciliation job
 
 Runs hourly. Three checks:
 
@@ -772,7 +806,7 @@ Recovery: on restart, the consumer re-reads from the last committed offset. The 
 
 State: projection somehow ends up out of sync with the ledger (bug, manual DB intervention, anything).
 
-Detection: reconciliation job (§7.5).
+Detection: reconciliation job (§7.6).
 
 Recovery: replay. `POST /admin/projections/{walletId}/rebuild` clears the projection row, scans all `ledger_entries` for the wallet in order, and rebuilds. Endpoint is admin-only and emits a clear audit event.
 
@@ -923,7 +957,7 @@ The build order matters. Build vertical slices, not horizontal layers. Each mile
 ### Milestone 5 — Observability (3 days)
 
 - Structured logging with `trace_id` propagation across HTTP and Kafka.
-- Prometheus metrics per §7.3.
+- Prometheus metrics per §7.4.
 - Jaeger spans across services.
 - Grafana dashboard `Transfers Overview`.
 

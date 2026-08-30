@@ -1,6 +1,6 @@
 # Task 07 — Tests (integration + unit)
 
-**Status:** Not started
+**Status:** Done
 **Owner:** Ledger Service
 **Depends on:** 02 (TST-INT-6), 04 (posting/happy-path), 05 (TST-INT-2); TST-INT-5 needs only the schema
 **Blocks:** milestone sign-off
@@ -14,9 +14,8 @@ Prove the milestone with real infrastructure: a `testcontainers-go` harness (rea
 
 ## Test framework (decision #3)
 
-- **`testcontainers-go`** for integration tests (consistency with the wallet-service's Testcontainers), under `services/ledger-service/tests/`.
+- **`dockertest`**, not `testcontainers-go`, under `services/ledger-service/tests/`. See **ADR-0005** — by the time this task was picked up, `migrations_test.go` already existed on `dockertest` and `go.mod` already depended on it; rewriting it for a cosmetic consistency win with wallet-service's Testcontainers wasn't worth the churn.
 - The harness must apply `services/ledger-service/migrations/` (via golang-migrate, per ADR-004) so the `ledger_app` role and grants are present — this is exactly what `services/ledger-service/tests/migrations_test.go` already does.
-- Record the divergence from `SPEC.md` §10.2's literal "dockertest" as **ADR-0004**.
 
 ## Integration scenarios
 
@@ -57,3 +56,14 @@ The integration suite (TST-INT-2/5/6 + posting + concurrency smoke) and domain u
 - Reuse a single container set per test package where possible (start Postgres/Kafka once) to keep the suite fast; apply migrations on startup.
 - TST-INT-6 specifically requires connecting as `ledger_app` — assert grants, not application logic. This is the test that makes the append-only guarantee real.
 - Keep test data accounts distinct from the V4-seeded external account to avoid cross-test interference.
+
+## Implementation record
+
+All scenarios pass under `go test ./...` (69 tests, 9 packages) against real Postgres + Kafka:
+
+- TST-INT-5 → `tests/posting_test.go` (`UnbalancedTransaction/TriggerAbortsCommit`).
+- TST-INT-6 → `assertLedgerSchemaHealthy` in `tests/testhelpers_test.go`, run from `migrations_test.go` and `migrations_rollback_test.go`.
+- TST-INT-2 → `tests/outbox_test.go` (`TestOutboxWorker_PublishesToKafka`).
+- Posting happy-path → `tests/posting_test.go` and `tests/posting_http_test.go`.
+- Concurrency smoke → `tests/posting_concurrency_test.go` (exactly one success/one `INSUFFICIENT_FUNDS`, plus a deadlock-ordering regression test).
+- Domain coverage: 81.8% (`go tool cover -func`), above the ≥80% bar.
