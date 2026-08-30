@@ -1,10 +1,5 @@
 services:
   jaeger:
-    # Jaeger v2 (ADR-0014): a distribution of the OTel Collector core with
-    # Jaeger's storage/query/UI added, so it terminates OTLP natively --
-    # config-file-driven, not env-var-driven like v1. No config file is
-    # mounted here, so it runs in its default all-in-one mode (in-memory
-    # storage, OTLP receivers on 4317/4318, UI on 16686).
     image: jaegertracing/jaeger:2.20.0
     ports:
       # UI only. OTLP ingest happens over the compose network directly from
