@@ -134,9 +134,9 @@ func TestE2E_InsufficientFunds(t *testing.T) {
 
 // TestE2E_TraceContextPropagatedToKafka guards NFR-OBS-2/NFR-OBS-5's async
 // propagation chain: the ledger.posted.v1 record produced for a transfer
-// must carry a well-formed W3C traceparent Kafka header, and the payload's
-// mirror field must match it (ADR-0013). This runs against the core-only
-// stack -- no observability containers required -- because Task 01 sets
+// must carry a well-formed W3C traceparent Kafka header (ADR-0013, the sole
+// propagation carrier). This runs against the core-only stack -- no
+// observability containers required -- because Task 01 sets
 // OTEL_EXPORTER_OTLP_ENDPOINT unconditionally in docker-compose.yml, so
 // spans are created and context injected even when the exporter can't reach
 // a collector.
@@ -179,14 +179,13 @@ func TestE2E_TraceContextPropagatedToKafka(t *testing.T) {
 		t.Errorf("traceparent = %q, want a well-formed W3C traceparent", traceparent)
 	}
 
-	// ADR-0013: the payload's traceparent field is a mirror of the header.
-	var payload struct {
-		Traceparent string `json:"traceparent"`
-	}
+	// ADR-0013: the header is the sole propagation carrier -- the payload
+	// must not carry a traceparent field at all.
+	var payload map[string]any
 	if err := json.Unmarshal(record.Value, &payload); err != nil {
 		t.Fatalf("decode ledger.posted.v1 payload: %v", err)
 	}
-	if payload.Traceparent != traceparent {
-		t.Errorf("payload traceparent = %q, want to match header traceparent %q", payload.Traceparent, traceparent)
+	if _, ok := payload["traceparent"]; ok {
+		t.Error("payload carries a traceparent field; propagation must be header-only")
 	}
 }

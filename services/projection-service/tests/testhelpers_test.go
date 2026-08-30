@@ -192,7 +192,6 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 		TransactionID   uuid.UUID      `json:"transactionId"`
 		TransactionType string         `json:"transactionType"`
 		Entries         []entryPayload `json:"entries"`
-		Traceparent     string         `json:"traceparent"`
 	}
 
 	eps := make([]entryPayload, len(entries))
@@ -207,7 +206,6 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 		TransactionID:   transactionID,
 		TransactionType: "TRANSFER",
 		Entries:         eps,
-		Traceparent:     traceparent,
 	})
 	if err != nil {
 		t.Fatalf("marshal ledger posted payload: %v", err)

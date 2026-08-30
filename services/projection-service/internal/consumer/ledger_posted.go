@@ -143,9 +143,9 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 // database being down) leaves the offset uncommitted so the record is
 // redelivered on the next tick (§9.9).
 func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
-	// Continue the ledger's trace. The Kafka header is authoritative; the
-	// payload's traceparent field is a mirror for debugging only (ADR-0013).
-	// This is the hop that makes NFR-OBS-5's single end-to-end trace possible.
+	// Continue the ledger's trace from the Kafka header (the sole propagation
+	// carrier, ADR-0013). This is the hop that makes NFR-OBS-5's single
+	// end-to-end trace possible.
 	ctx = otel.GetTextMapPropagator().Extract(ctx, recordCarrier(r.Headers))
 	ctx, span := tracer.Start(ctx, "projection apply",
 		trace.WithSpanKind(trace.SpanKindConsumer),

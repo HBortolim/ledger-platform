@@ -20,7 +20,6 @@ type ledgerPostedEvent struct {
 	TransactionID   uuid.UUID    `json:"transactionId"`
 	TransactionType string       `json:"transactionType"`
 	Entries         []entryEvent `json:"entries"`
-	Traceparent     string       `json:"traceparent"`
 }
 
 type entryEvent struct {

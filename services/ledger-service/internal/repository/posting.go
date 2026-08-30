@@ -361,9 +361,6 @@ type ledgerPostedPayload struct {
 	TransactionID   uuid.UUID      `json:"transactionId"`
 	TransactionType string         `json:"transactionType"`
 	Entries         []entryPayload `json:"entries"`
-	// Mirror of the Kafka traceparent header; the header is authoritative
-	// for propagation (ADR-0013). Empty when tracing is disabled.
-	Traceparent string `json:"traceparent"`
 }
 
 type entryPayload struct {
@@ -399,10 +396,6 @@ func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction)
 		TransactionID:   t.ID,
 		TransactionType: string(t.Type),
 		Entries:         eps,
-		// Mirrors the header for human debuggability and §7.3 schema
-		// conformance. The header is authoritative for propagation --
-		// consumers MUST prefer it (ADR-0013).
-		Traceparent: carrier["traceparent"],
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
