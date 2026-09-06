@@ -396,6 +396,7 @@ func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction)
 	if err != nil {
 		return fmt.Errorf("marshal outbox payload: %w", err)
 	}
+	//flatten span context into a JSONB map[string]string for storage
 	headersJSON, err := json.Marshal(map[string]string(carrier))
 	if err != nil {
 		return fmt.Errorf("marshal outbox headers: %w", err)
