@@ -6,6 +6,7 @@ import com.ledger.wallet.api.dto.ValidationErrorResponse;
 import com.ledger.wallet.domain.exception.DomainValidationException;
 import com.ledger.wallet.domain.exception.TransferInProgressException;
 import com.ledger.wallet.domain.exception.WalletAccessDeniedException;
+import com.ledger.wallet.domain.exception.WalletConflictException;
 import com.ledger.wallet.domain.exception.code.DomainErrorCode;
 import com.ledger.wallet.infrastructure.ledger.LedgerUnavailableException;
 import org.springframework.http.HttpHeaders;
@@ -52,7 +53,7 @@ public class GlobalExceptionHandler {
     // CreateTransferRequest's amount failures from a bare 400 to 422 INVALID_AMOUNT. Any other
     // endpoint's validation failures (e.g. blank wallet currency) keep the plain 400.
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidationError(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ValidationErrorResponse> handleValidationError(MethodArgumentNotValidException ex) {
         boolean isTransferAmountFailure = ex.getBindingResult().getTarget() instanceof CreateTransferRequest
                 && ex.getBindingResult().getFieldErrors().stream().allMatch(fe -> "amount".equals(fe.getField()));
 
@@ -62,4 +63,11 @@ public class GlobalExceptionHandler {
         }
         return ResponseEntity.badRequest().build();
     }
+
+    @ExceptionHandler(WalletConflictException.class)
+    public ResponseEntity<ErrorResponse> handleWalletConflict(WalletConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(ex.getCode(), ex.getMessage()));
+    }
+
 }

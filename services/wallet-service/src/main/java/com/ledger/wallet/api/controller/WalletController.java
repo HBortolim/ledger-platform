@@ -4,6 +4,7 @@ import com.ledger.wallet.api.dto.BalanceResponse;
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.api.dto.CreateWalletResponse;
 import com.ledger.wallet.api.dto.GetWalletResponse;
+import com.ledger.wallet.application.usecase.ChangeWalletStatusUseCase;
 import com.ledger.wallet.application.usecase.CreateWalletUseCase;
 import com.ledger.wallet.application.usecase.GetBalanceUseCase;
 import com.ledger.wallet.application.usecase.GetWalletUseCase;
@@ -28,11 +29,13 @@ public class WalletController {
     private final CreateWalletUseCase createWalletUseCase;
     private final GetWalletUseCase getWalletUseCase;
     private final GetBalanceUseCase getBalanceUseCase;
+    private final ChangeWalletStatusUseCase changeWalletStatusUseCase;
 
-    public WalletController(CreateWalletUseCase createWalletUseCase, GetWalletUseCase getWalletUseCase, GetBalanceUseCase getBalanceUseCase) {
+    public WalletController(CreateWalletUseCase createWalletUseCase, GetWalletUseCase getWalletUseCase, GetBalanceUseCase getBalanceUseCase, ChangeWalletStatusUseCase changeWalletStatusUseCase) {
         this.createWalletUseCase = createWalletUseCase;
         this.getWalletUseCase = getWalletUseCase;
         this.getBalanceUseCase = getBalanceUseCase;
+        this.changeWalletStatusUseCase = changeWalletStatusUseCase;
     }
 
     @PostMapping
@@ -59,17 +62,20 @@ public class WalletController {
     }
 
     @PostMapping("/{walletId}/freeze")
-    public ResponseEntity<?> freeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
-        throw new UnsupportedOperationException("not yet implemented");
+    public ResponseEntity<GetWalletResponse> freeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
+        final var response = changeWalletStatusUseCase.freeze(walletId, principal);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     @PostMapping("/{walletId}/unfreeze")
-    public ResponseEntity<?> unfreeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
-        throw new UnsupportedOperationException("not yet implemented");
+    public ResponseEntity<GetWalletResponse> unfreeze(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
+        final var response =  changeWalletStatusUseCase.unfreeze(walletId, principal);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     @PostMapping("/{walletId}/close")
-    public ResponseEntity<?> close(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
-        throw new UnsupportedOperationException("not yet implemented");
+    public ResponseEntity<GetWalletResponse> close(@PathVariable UUID walletId, @AuthenticationPrincipal AuthenticatedUser principal) {
+        final var response = changeWalletStatusUseCase.close(walletId, principal);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 }

@@ -1,9 +1,12 @@
 package com.ledger.wallet.api.advice;
 
 import com.ledger.wallet.api.dto.CreateTransferRequest;
+import com.ledger.wallet.api.dto.ErrorResponse;
 import com.ledger.wallet.api.dto.CreateWalletRequest;
 import com.ledger.wallet.domain.exception.TransferInProgressException;
 import com.ledger.wallet.domain.exception.WalletAccessDeniedException;
+import com.ledger.wallet.domain.exception.WalletConflictException;
+import com.ledger.wallet.domain.exception.code.DomainErrorCode;
 import com.ledger.wallet.infrastructure.ledger.LedgerUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -16,6 +19,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +39,7 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("2", response.getHeaders().getFirst("Retry-After"));
+        assertNotNull(response.getBody());
         assertTrue(response.getBody().toString().contains("LEDGER_UNAVAILABLE"),
                 "expected body to contain LEDGER_UNAVAILABLE, got: " + response.getBody());
     }
@@ -52,6 +57,7 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<?> response = handler.handleTransferInProgress(new TransferInProgressException());
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertTrue(response.getBody().toString().contains("IN_PROGRESS"),
                 "expected body to contain IN_PROGRESS, got: " + response.getBody());
     }
@@ -69,6 +75,7 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<?> response = handler.handleValidationError(ex);
 
         assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertTrue(response.getBody().toString().contains("INVALID_AMOUNT"),
                 "expected body to contain INVALID_AMOUNT, got: " + response.getBody());
     }
@@ -85,5 +92,27 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<?> response = handler.handleValidationError(ex);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void handleWalletConflict_nonZeroBalance_returns409WithCodeAndMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleWalletConflict(
+                new WalletConflictException(DomainErrorCode.NONZERO_BALANCE, "wallet balance must be zero to close"));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(DomainErrorCode.NONZERO_BALANCE, response.getBody().code());
+        assertEquals("wallet balance must be zero to close", response.getBody().message());
+    }
+
+    @Test
+    void handleWalletConflict_walletClosed_returns409WithCodeAndMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleWalletConflict(
+                new WalletConflictException(DomainErrorCode.WALLET_CLOSED, "wallet is closed and cannot change status"));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(DomainErrorCode.WALLET_CLOSED, response.getBody().code());
+        assertEquals("wallet is closed and cannot change status", response.getBody().message());
     }
 }

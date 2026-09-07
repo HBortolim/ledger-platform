@@ -67,6 +67,19 @@ public class WalletJdbcRepository implements WalletRepository {
         return jdbc.query(sql, params, WalletJdbcRepository::mapRow).stream().findFirst();
     }
 
+    @Override
+    public int updateStatus(UUID walletId, WalletStatus status) {
+        String sql = """
+                UPDATE wallet_db.wallets SET status = :status, updated_at = now() WHERE id = :id
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("id", walletId);
+        params.addValue("status", status.name());
+
+        return jdbc.update(sql, params);
+    }
+
     private static Wallet mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new Wallet(
                 rs.getObject("id", UUID.class),

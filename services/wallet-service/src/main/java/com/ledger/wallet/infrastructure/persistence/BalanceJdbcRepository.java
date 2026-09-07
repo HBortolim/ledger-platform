@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -35,6 +36,20 @@ public class BalanceJdbcRepository implements BalanceRepository {
         params.addValue("walletId", walletId);
 
         return jdbc.queryForObject(sql, params, BalanceJdbcRepository::mapRow);
+    }
+
+    @Override
+    public BigDecimal getLedgerBalance(UUID walletId) {
+        String sql = """
+                SELECT COALESCE(SUM(CASE WHEN entry_type = 'CREDIT' THEN amount ELSE -amount END), 0)
+                  FROM ledger_db.ledger_entries
+                 WHERE account_id = :walletId
+                """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("walletId", walletId);
+
+        return jdbc.queryForObject(sql, params, BigDecimal.class);
     }
 
     private static Balance mapRow(ResultSet rs, int rowNum) throws SQLException {

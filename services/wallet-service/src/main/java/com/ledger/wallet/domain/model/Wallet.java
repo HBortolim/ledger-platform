@@ -1,5 +1,6 @@
 package com.ledger.wallet.domain.model;
 
+import com.ledger.wallet.domain.exception.WalletConflictException;
 import com.ledger.wallet.domain.exception.code.DomainErrorCode;
 
 import java.time.Instant;
@@ -37,5 +38,20 @@ public record Wallet(
 
     public boolean isClosed() {
         return status == WalletStatus.CLOSED;
+    }
+
+    public Wallet apply(AuditAction action) {
+        if (!action.isStatusTransition()) {
+            throw new IllegalArgumentException(action + " is not a lifecycle action");
+        }
+        WalletStatus target = action.resultingStatus();
+        if (status == target) {
+            return this;
+        }
+        if (status == WalletStatus.CLOSED) {
+            throw new WalletConflictException(DomainErrorCode.WALLET_CLOSED,
+                    "wallet is closed and cannot change status");
+        }
+        return new Wallet(id, ownerId, currency, target, createdAt, updatedAt);
     }
 }

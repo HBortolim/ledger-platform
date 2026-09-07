@@ -94,6 +94,22 @@ class BalanceJdbcRepositoryIT extends BaseIntegrationTest {
         }
     }
 
+    private void insertLedgerEntry(UUID accountId, String entryType, String amount) throws Exception {
+        try (Connection conn = ownerConnection();
+             PreparedStatement ps = conn.prepareStatement("""
+                     INSERT INTO ledger_db.ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?)
+                     """)) {
+            ps.setObject(1, UUID.randomUUID());
+            ps.setObject(2, UUID.randomUUID());
+            ps.setObject(3, accountId);
+            ps.setString(4, entryType);
+            ps.setBigDecimal(5, new BigDecimal(amount));
+            ps.setObject(6, Instant.now().atOffset(ZoneOffset.UTC));
+            ps.executeUpdate();
+        }
+    }
+
     private void insertLedgerEntry(UUID accountId, Instant createdAt) throws Exception {
         try (Connection conn = ownerConnection();
              PreparedStatement ps = conn.prepareStatement("""
@@ -172,5 +188,77 @@ class BalanceJdbcRepositoryIT extends BaseIntegrationTest {
         Balance balance = repository.getByWalletId(walletId);
 
         assertThat(balance.latestEntryAt()).isNull();
+    }
+
+    @Test
+    void getLedgerBalance_returnsBalance() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        BigDecimal expectedBalance = new BigDecimal("10.00");
+        insertLedgerEntry(walletId, Instant.now());
+
+        BigDecimal balance = repository.getLedgerBalance(walletId);
+
+        assertThat(balance)
+                .isNotNull()
+                .isEqualByComparingTo(expectedBalance);
+    }
+
+    @Test
+    void getLedgerBalance_noEntry_returnsZeroBalance() {
+        UUID walletId = UUID.randomUUID();
+        BigDecimal expectedBalance = BigDecimal.ZERO;
+
+        BigDecimal balance =  repository.getLedgerBalance(walletId);
+
+        assertThat(balance)
+                .isNotNull()
+                .isEqualByComparingTo(expectedBalance);
+    }
+
+    @Test
+    void getLedgerBalance_creditsAndDebits_returnsSignedSum() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        insertLedgerEntry(walletId, "CREDIT", "500.00");
+        insertLedgerEntry(walletId, "CREDIT", "25.50");
+        insertLedgerEntry(walletId, "DEBIT", "200.00");
+
+        assertThat(repository.getLedgerBalance(walletId)).isEqualByComparingTo("325.50");
+    }
+
+    @Test
+    void getLedgerBalance_fundedThenDrained_returnsExactlyZero() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        insertLedgerEntry(walletId, "CREDIT", "77.77");
+        insertLedgerEntry(walletId, "DEBIT", "77.77");
+
+        assertThat(repository.getLedgerBalance(walletId)).isEqualByComparingTo("0.00");
+        assertThat(repository.getLedgerBalance(walletId).signum()).isZero();
+    }
+
+    @Test
+    void getLedgerBalance_debitsOnly_returnsNegative() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        insertLedgerEntry(walletId, "DEBIT", "10.00");
+
+        assertThat(repository.getLedgerBalance(walletId)).isEqualByComparingTo("-10.00");
+    }
+
+    @Test
+    void getLedgerBalance_ignoresOtherAccountsEntries() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        UUID otherWalletId = UUID.randomUUID();
+        insertLedgerEntry(walletId, "CREDIT", "10.00");
+        insertLedgerEntry(otherWalletId, "CREDIT", "999.00");
+
+        assertThat(repository.getLedgerBalance(walletId)).isEqualByComparingTo("10.00");
+    }
+
+    @Test
+    void getLedgerBalance_preservesTwoDecimalScale() throws Exception {
+        UUID walletId = UUID.randomUUID();
+        insertLedgerEntry(walletId, "CREDIT", "0.01");
+
+        assertThat(repository.getLedgerBalance(walletId)).isEqualByComparingTo("0.01");
+        assertThat(repository.getLedgerBalance(walletId).signum()).isEqualTo(1);
     }
 }

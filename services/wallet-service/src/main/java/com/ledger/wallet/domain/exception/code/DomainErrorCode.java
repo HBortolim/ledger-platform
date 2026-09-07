@@ -14,5 +14,9 @@ public final class DomainErrorCode {
     public static final String IN_PROGRESS = "IN_PROGRESS";
     public static final String LEDGER_UNAVAILABLE = "LEDGER_UNAVAILABLE";
 
+    // FR-3/FR-4: wallet lifecycle
+    public static final String WALLET_CLOSED = "WALLET_CLOSED";
+    public static final String NONZERO_BALANCE = "NONZERO_BALANCE";
+
     private DomainErrorCode() {}
 }
