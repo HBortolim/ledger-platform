@@ -408,4 +408,41 @@ func TestPostingRepository(t *testing.T) {
 			t.Errorf("account B balance = %s, want unchanged 200.00 (mid-flow failure must roll back every account, not just the failing one)", balanceB)
 		}
 	})
+
+	t.Run("SystemAccountFunding/ExemptFromDailyCap", func(t *testing.T) {
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"), systemFundingAccountID)
+
+		debit, credit := uuid.New(), uuid.New()
+		seedAccountBalance(t, pool, debit, "10000.00") // plenty of balance headroom; only the cap should trigger
+
+		first := newBalancedTransfer(systemFundingAccountID, credit, "60.00")
+		if err := cappedRepo.Post(ctx, first); err != nil {
+			t.Fatalf("first Post() = error %v, want nil", err)
+		}
+
+		second := newBalancedTransfer(systemFundingAccountID, credit, "50.00") // 60 + 50 = 110 > 100 cap
+		if err := cappedRepo.Post(ctx, second); err != nil {
+			t.Fatalf("second Post() = error %v, want nil (system account is exempt from daily cap)", err)
+		}
+	})
+
+	t.Run("RegularAccountFunding/SubjectToDailyCap", func(t *testing.T){
+		var dailyCap domain.ErrDailyCapExceeded
+
+		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"), systemFundingAccountID)
+
+		debit, credit := uuid.New(), uuid.New()
+		seedAccountBalance(t, pool, debit, "10000.00")
+
+		first := newBalancedTransfer(debit, credit, "60.00")
+		if err := cappedRepo.Post(ctx, first); err != nil {
+			t.Fatalf("first Post() = error %v, want nil", err)
+		}
+
+		second := newBalancedTransfer(debit, credit, "50.00")
+		err := cappedRepo.Post(ctx, second)
+		if !errors.As(err, &dailyCap) {
+			t.Fatalf("second Post() = %v, want ErrDailyCapExceeded", err)
+		}
+	})
 }

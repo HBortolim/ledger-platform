@@ -57,7 +57,7 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 
 	// Step 3.5: Daily per-account transfer cap, same locked transaction as the balance check
 	// above — closes the TOCTOU race an unlocked pre-check outside this transaction would have.
-	if err := checkDailyTransferCap(ctx, dbtx, tx.Entries, r.dailyCap); err != nil {
+	if err := checkDailyTransferCap(ctx, dbtx, tx.Entries, r.dailyCap, r.systemAccountID); err != nil {
 		return err
 	}
 
@@ -258,9 +258,12 @@ func (r *PostingRepository) checkAvailableBalance(entries []domain.LedgerEntry, 
 // this posting's own debit amount, and rejects if that total exceeds dailyCap. Runs inside the
 // same locked transaction as checkAvailableBalance (called after lockAccounts), so a concurrent
 // posting against the same account can't slip past both checks with a stale read.
-func checkDailyTransferCap(ctx context.Context, tx pgx.Tx, entries []domain.LedgerEntry, dailyCap decimal.Decimal) error {
+func checkDailyTransferCap(ctx context.Context, tx pgx.Tx, entries []domain.LedgerEntry, dailyCap decimal.Decimal, systemAccountID uuid.UUID) error {
 	debitTotals := make(map[uuid.UUID]decimal.Decimal)
 	for _, e := range entries {
+		if e.AccountID == systemAccountID {
+			continue
+		}
 		if e.EntryType == domain.Debit {
 			debitTotals[e.AccountID] = debitTotals[e.AccountID].Add(e.Amount.Decimal())
 		}
