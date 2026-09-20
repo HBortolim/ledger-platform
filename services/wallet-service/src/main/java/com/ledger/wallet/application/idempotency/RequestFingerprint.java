@@ -1,7 +1,9 @@
 package com.ledger.wallet.application.idempotency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.wallet.api.dto.CreateDepositRequest;
 import com.ledger.wallet.api.dto.CreateTransferRequest;
+import com.ledger.wallet.api.dto.CreateWithdrawalRequest;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,6 +31,34 @@ public final class RequestFingerprint {
         canonical.put("sourceWalletId", request.sourceWalletId().toString());
         canonical.put("destinationWalletId", request.destinationWalletId().toString());
         canonical.put("amount", request.amount().toPlainString());
+
+        try {
+            String json = MAPPER.writeValueAsString(canonical);
+            return sha256Hex(json);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to compute request fingerprint", e);
+        }
+    }
+
+    public static String of(CreateDepositRequest request) {
+        Map<String, Object> canonical = new LinkedHashMap<>();
+        canonical.put("amount", request.amount().toPlainString());
+        canonical.put("destinationWalletId", request.destinationWalletId().toString());
+        canonical.put("type", "DEPOSIT");
+
+        try {
+            String json = MAPPER.writeValueAsString(canonical);
+            return sha256Hex(json);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to compute request fingerprint", e);
+        }
+    }
+
+    public static String of(CreateWithdrawalRequest request) {
+        Map<String, Object> canonical = new LinkedHashMap<>();
+        canonical.put("amount", request.amount().toPlainString());
+        canonical.put("sourceWalletId", request.sourceWalletId().toString());
+        canonical.put("type", "WITHDRAWAL");
 
         try {
             String json = MAPPER.writeValueAsString(canonical);

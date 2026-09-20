@@ -1,7 +1,9 @@
 package com.ledger.wallet.application.idempotency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.wallet.api.dto.CreateDepositRequest;
 import com.ledger.wallet.api.dto.CreateTransferRequest;
+import com.ledger.wallet.api.dto.CreateWithdrawalRequest;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -108,5 +110,37 @@ class RequestFingerprintTest {
         CreateTransferRequest b = mapper.readValue(whitespaced, CreateTransferRequest.class);
 
         assertThat(RequestFingerprint.of(a)).isEqualTo(RequestFingerprint.of(b));
+    }
+
+    @Test
+    void sameLogicalDepositRequest_producesSameFingerprint() {
+        UUID wallet = UUID.randomUUID();
+
+        CreateDepositRequest a = new CreateDepositRequest(wallet, new BigDecimal("100.00"), "rent");
+        CreateDepositRequest b = new CreateDepositRequest(wallet, new BigDecimal("100.00"), "rent (corrected)");
+
+        assertThat(RequestFingerprint.of(a)).isEqualTo(RequestFingerprint.of(b));
+    }
+
+    @Test
+    void sameLogicalWithdrawalRequest_producesSameFingerprint() {
+        UUID wallet = UUID.randomUUID();
+
+        CreateWithdrawalRequest a = new CreateWithdrawalRequest(wallet, new BigDecimal("100.00"), "rent");
+        CreateWithdrawalRequest b = new CreateWithdrawalRequest(wallet, new BigDecimal("100.00"), "rent (corrected)");
+
+        assertThat(RequestFingerprint.of(a)).isEqualTo(RequestFingerprint.of(b));
+    }
+
+    @Test
+    void depositAndWithdrawal_sameWalletAndAmount_produceDifferentFingerprints() {
+        // Same wallet + amount happening to coincide between a deposit and a withdrawal must
+        // never collide on a reused Idempotency-Key -- the "type" discriminator prevents that.
+        UUID wallet = UUID.randomUUID();
+
+        CreateDepositRequest deposit = new CreateDepositRequest(wallet, new BigDecimal("100.00"), null);
+        CreateWithdrawalRequest withdrawal = new CreateWithdrawalRequest(wallet, new BigDecimal("100.00"), null);
+
+        assertThat(RequestFingerprint.of(deposit)).isNotEqualTo(RequestFingerprint.of(withdrawal));
     }
 }

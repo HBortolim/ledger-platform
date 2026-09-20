@@ -49,6 +49,7 @@ logging:
 ledger:
   service:
     url: ${LEDGER_SERVICE_URL:http://localhost:8081}
+  system-account-id: ${SYSTEM_ACCOUNT_ID:00000000-0000-0000-0000-000000000001}
   idempotency:
     ttl-hours: 24
     pending-sweep-seconds: 60

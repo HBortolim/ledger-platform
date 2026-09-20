@@ -1,6 +1,8 @@
 package com.ledger.wallet.api.advice;
 
+import com.ledger.wallet.api.dto.CreateDepositRequest;
 import com.ledger.wallet.api.dto.CreateTransferRequest;
+import com.ledger.wallet.api.dto.CreateWithdrawalRequest;
 import com.ledger.wallet.api.dto.ErrorResponse;
 import com.ledger.wallet.api.dto.ValidationErrorResponse;
 import com.ledger.wallet.domain.exception.DomainValidationException;
@@ -49,12 +51,16 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(DomainErrorCode.IN_PROGRESS, "the original request has not completed yet"));
     }
 
-    // AC-5.6: bean validation already rejects amount <= 0 / wrong scale; this only upgrades
-    // CreateTransferRequest's amount failures from a bare 400 to 422 INVALID_AMOUNT. Any other
-    // endpoint's validation failures (e.g. blank wallet currency) keep the plain 400.
+    // AC-5.6/AC-6.1: bean validation already rejects amount <= 0 / wrong scale; this only upgrades
+    // CreateTransferRequest/CreateDepositRequest/CreateWithdrawalRequest amount failures from a
+    // bare 400 to 422 INVALID_AMOUNT. Any other endpoint's validation failures (e.g. blank wallet
+    // currency) keep the plain 400.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ValidationErrorResponse> handleValidationError(MethodArgumentNotValidException ex) {
-        boolean isTransferAmountFailure = ex.getBindingResult().getTarget() instanceof CreateTransferRequest
+        Object target = ex.getBindingResult().getTarget();
+        boolean isTransferAmountFailure = (target instanceof CreateTransferRequest
+                || target instanceof CreateDepositRequest
+                || target instanceof CreateWithdrawalRequest)
                 && ex.getBindingResult().getFieldErrors().stream().allMatch(fe -> "amount".equals(fe.getField()));
 
         if (isTransferAmountFailure) {
