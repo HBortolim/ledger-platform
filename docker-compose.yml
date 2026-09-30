@@ -40,6 +40,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ledger-migrate:
+        condition: service_completed_successfully
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0

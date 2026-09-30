@@ -8,17 +8,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
-)
 
-// signedDelta converts an entry's unsigned amount into the signed delta
-// applied to a wallet's cached balance, per SPEC.md §3.3: CREDIT is
-// positive, DEBIT is negative.
-func signedDelta(entryType string, amount decimal.Decimal) decimal.Decimal {
-	if entryType == "DEBIT" {
-		return amount.Neg()
-	}
-	return amount
-}
+	"github.com/ledger-platform/projection-service/internal/utils"
+)
 
 // applyEntry idempotently applies one entry's signed delta to
 // projection_db.wallet_balances. The WHERE clause on the ON CONFLICT branch
@@ -82,7 +74,7 @@ func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent
 
 	anyApplied := false
 	for _, e := range event.Entries {
-		ok, err := applyEntry(ctx, dbtx, e.AccountID, e.EntryID, signedDelta(e.EntryType, e.Amount))
+		ok, err := applyEntry(ctx, dbtx, e.AccountID, e.EntryID, utils.SignedDelta(e.EntryType, e.Amount))
 		if err != nil {
 			return "", err
 		}

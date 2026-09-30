@@ -62,6 +62,9 @@ func setupProjectionDB(t *testing.T) (ownerDSN, appDSN string) {
 		t.Fatalf("postgres never became ready: %v", err)
 	}
 
+	// Must precede the migrations: 0004 GRANTs on ledger_db, which does not exist yet.
+	seedLedgerSchema(t, ownerDSN)
+
 	m, err := migrate.New("file://../migrations", ownerDSN+"&x-migrations-table=projection_schema_migrations")
 	if err != nil {
 		t.Fatalf("could not init migrate: %v", err)
@@ -71,6 +74,42 @@ func setupProjectionDB(t *testing.T) (ownerDSN, appDSN string) {
 	}
 
 	return ownerDSN, appDSN
+}
+
+// seedLedgerSchema creates the minimal ledger_db schema and ledger_entries table
+// that the Projection Service reads from (migration 0004's grant, and Rebuild).
+//
+// ledger_db belongs to the Ledger Service and is normally created by ITS
+// migrations, which never run in this container -- so it must be created here,
+// BEFORE the projection migrations, or 0004 fails on a missing schema. The
+// authoritative DDL is services/ledger-service/migrations/0001_ledger_schema.up.sql;
+// this keeps its CHECK constraints (so fixtures cannot be more permissive than
+// production) and drops the FK to ledger_transactions, which nothing here reads.
+func seedLedgerSchema(t *testing.T, ownerDSN string) {
+	t.Helper()
+
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, ownerDSN)
+	if err != nil {
+		t.Fatalf("seedLedgerSchema: connect as owner: %v", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	for _, stmt := range []string{
+		`CREATE SCHEMA IF NOT EXISTS ledger_db`,
+		`CREATE TABLE IF NOT EXISTS ledger_db.ledger_entries (
+			id              UUID PRIMARY KEY,
+			transaction_id  UUID NOT NULL,
+			account_id      UUID NOT NULL,
+			entry_type      VARCHAR(8) NOT NULL CHECK (entry_type IN ('DEBIT','CREDIT')),
+			amount          NUMERIC(19, 2) NOT NULL CHECK (amount > 0),
+			created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`,
+	} {
+		if _, err := conn.Exec(ctx, stmt); err != nil {
+			t.Fatalf("seedLedgerSchema: %v", err)
+		}
+	}
 }
 
 // setupKafka spins an ephemeral single-node KRaft Kafka broker via dockertest

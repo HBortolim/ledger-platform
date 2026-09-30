@@ -36,3 +36,20 @@ var ConsumerLag = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "projection_consumer_lag",
 	Help: "Kafka consumer lag (high watermark minus last committed offset) per topic/partition.",
 }, []string{"topic", "partition"})
+
+// RebuildsTotal counts admin-triggered projection rebuilds (SPEC.md §9.7),
+// labeled by outcome: ok or error. A rebuild is an incident-time action that
+// should almost never happen, so this counter is how it stays visible in
+// Prometheus after the fact. One increment per rebuild attempted -- a request
+// rejected for a malformed wallet id never reaches the service and is not counted.
+var RebuildsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "projection_rebuilds_total",
+	Help: "Total projection rebuilds attempted from the ledger, labeled by outcome (ok, error).",
+}, []string{"result"})
+
+func init() {
+	// Materialize both series at 0 so increase()/absent() alerts work before the first
+	// rebuild ever happens; otherwise a series only appears after the first incident.
+	RebuildsTotal.WithLabelValues("ok")
+	RebuildsTotal.WithLabelValues("error")
+}

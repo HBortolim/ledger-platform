@@ -15,6 +15,8 @@ import (
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/consumer"
 	"github.com/ledger-platform/projection-service/internal/handler"
+	"github.com/ledger-platform/projection-service/internal/service"
+	"github.com/ledger-platform/projection-service/internal/repository"
 	"github.com/ledger-platform/projection-service/internal/logging"
 	"github.com/ledger-platform/projection-service/internal/observability"
 )
@@ -51,9 +53,13 @@ func main() {
 	}
 	defer pool.Close()
 
+	rebuildRepository := repository.NewRebuildRepository(pool)
+	rebuildService := service.NewRebuildService(rebuildRepository)
+	rebuildHandler := handler.NewRebuildHandler(rebuildService)
+
 	router := gin.New()
 	router.Use(gin.Recovery())
-	handler.RegisterRoutes(router, pool)
+	handler.RegisterRoutes(router, pool, rebuildHandler)
 
 	go func() {
 		c := consumer.NewLedgerPostedConsumer(pool, config)
