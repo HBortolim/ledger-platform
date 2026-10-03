@@ -11,6 +11,7 @@ import com.ledger.wallet.domain.exception.WalletAccessDeniedException;
 import com.ledger.wallet.domain.exception.WalletConflictException;
 import com.ledger.wallet.domain.exception.code.DomainErrorCode;
 import com.ledger.wallet.infrastructure.ledger.LedgerUnavailableException;
+import com.ledger.wallet.infrastructure.projection.ProjectionUnavailableException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header(HttpHeaders.RETRY_AFTER, "2")
                 .body(new ErrorResponse(DomainErrorCode.LEDGER_UNAVAILABLE, null));
+    }
+
+    @ExceptionHandler(ProjectionUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleProjectionUnavailable(ProjectionUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, "2")
+                .body(new ErrorResponse(DomainErrorCode.PROJECTION_UNAVAILABLE, null));
     }
 
     // AC-5.11: same response whether the source wallet doesn't exist or just isn't the caller's.

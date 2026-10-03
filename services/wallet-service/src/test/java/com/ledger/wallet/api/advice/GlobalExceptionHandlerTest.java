@@ -8,6 +8,7 @@ import com.ledger.wallet.domain.exception.WalletAccessDeniedException;
 import com.ledger.wallet.domain.exception.WalletConflictException;
 import com.ledger.wallet.domain.exception.code.DomainErrorCode;
 import com.ledger.wallet.infrastructure.ledger.LedgerUnavailableException;
+import com.ledger.wallet.infrastructure.projection.ProjectionUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,18 @@ class GlobalExceptionHandlerTest {
         assertNotNull(response.getBody());
         assertTrue(response.getBody().toString().contains("LEDGER_UNAVAILABLE"),
                 "expected body to contain LEDGER_UNAVAILABLE, got: " + response.getBody());
+    }
+
+    @Test
+    void handleProjectionUnavailable_returns503WithRetryAfterAndCode() {
+        ResponseEntity<?> response = handler.handleProjectionUnavailable(
+                new ProjectionUnavailableException("projection service unreachable")
+        );
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertEquals("2", response.getHeaders().getFirst("Retry-After"));
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().toString().contains("PROJECTION_UNAVAILABLE"),
+                "expected body to contain PROJECTION_UNAVAILABLE, got: " + response.getBody());
     }
 
     @Test

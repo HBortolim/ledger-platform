@@ -53,6 +53,9 @@ ledger:
   idempotency:
     ttl-hours: 24
     pending-sweep-seconds: 60
+projection:
+  service:
+    url: ${PROJECTION_SERVICE_URL:http://localhost:8082}
 
 jwt:
   public-key-path: ${JWT_PUBLIC_KEY_PATH:keys/public.pem}
