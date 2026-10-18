@@ -179,8 +179,8 @@ func setupKafka(t *testing.T) (bootstrap string) {
 	bootstrap = "localhost:" + hostPort
 
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "confluentinc/cp-kafka",
-		Tag:        "7.6.0",
+		Repository: "apache/kafka",
+		Tag:        "3.9.1",
 		Env: []string{
 			"KAFKA_NODE_ID=1",
 			"KAFKA_PROCESS_ROLES=broker,controller",
