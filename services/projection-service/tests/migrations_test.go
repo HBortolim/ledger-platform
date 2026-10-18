@@ -139,13 +139,14 @@ func TestMigration0004_GrantsLedgerReadOnly_AndRollsBack(t *testing.T) {
 		}
 	}
 
-	// Roll back exactly one step: 0004 is the newest migration.
+	// Roll back to version 3, undoing 0004 and anything applied after it (0005).
+	// Targeting the version, not a step count, keeps this correct as newer migrations land.
 	m, err := migrate.New("file://../migrations", ownerDSN+"&x-migrations-table=projection_schema_migrations")
 	if err != nil {
 		t.Fatalf("could not init migrate: %v", err)
 	}
-	if err := m.Steps(-1); err != nil {
-		t.Fatalf("rolling back 0004: %v", err)
+	if err := m.Migrate(3); err != nil {
+		t.Fatalf("rolling back to 0003: %v", err)
 	}
 
 	// Postgres checks privileges per statement, so the same pool sees the revoke immediately.
@@ -159,7 +160,7 @@ func TestMigration0004_GrantsLedgerReadOnly_AndRollsBack(t *testing.T) {
 
 	// Up again must restore it (the .down is a true inverse).
 	if err := m.Up(); err != nil {
-		t.Fatalf("re-applying 0004: %v", err)
+		t.Fatalf("re-applying 0004 onward: %v", err)
 	}
 	if _, err := app.Exec(ctx, `SELECT count(*) FROM ledger_db.ledger_entries`); err != nil {
 		t.Errorf("after re-applying 0004, projection_app SELECT = %v, want nil", err)
