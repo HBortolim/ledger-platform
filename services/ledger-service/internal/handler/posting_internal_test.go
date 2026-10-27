@@ -186,7 +186,7 @@ func TestPostPosting_Unbalanced_Returns422UnbalancedCode(t *testing.T) {
 	txID, debit, credit := uuid.New(), uuid.New(), uuid.New()
 	svc := &fakePostingService{
 		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, service.ErrUnbalanced{Message: "transaction is unbalanced (net = 50.00)"}
+			return domain.LedgerTransaction{}, domain.ErrUnbalanced{Message: "transaction is unbalanced (net = 50.00)"}
 		},
 	}
 	r := newTestRouter(svc)
@@ -203,7 +203,7 @@ func TestPostPosting_InvalidAmount_Returns422InvalidAmountCode(t *testing.T) {
 	txID, debit, credit := uuid.New(), uuid.New(), uuid.New()
 	svc := &fakePostingService{
 		postFunc: func(ctx context.Context, in service.PostInput) (domain.LedgerTransaction, error) {
-			return domain.LedgerTransaction{}, service.ErrInvalidAmount{Reason: `money value "100" must have exactly 2 decimal places`}
+			return domain.LedgerTransaction{}, domain.ErrInvalidAmount{Reason: `money value "100" must have exactly 2 decimal places`}
 		},
 	}
 	r := newTestRouter(svc)

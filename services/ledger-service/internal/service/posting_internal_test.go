@@ -83,7 +83,7 @@ func TestPost_UnbalancedEntries_ReturnsErrUnbalanced_WithoutCallingRepo(t *testi
 		},
 	})
 
-	var unbalanced ErrUnbalanced
+	var unbalanced domain.ErrUnbalanced
 	if !errors.As(err, &unbalanced) {
 		t.Fatalf("Post() = %v, want ErrUnbalanced", err)
 	}
@@ -109,7 +109,7 @@ func TestPost_InvalidAmount_ReturnsErrInvalidAmount_WithoutCallingRepo(t *testin
 		},
 	})
 
-	var invalidAmount ErrInvalidAmount
+	var invalidAmount domain.ErrInvalidAmount
 	if !errors.As(err, &invalidAmount) {
 		t.Fatalf("Post() = %v, want ErrInvalidAmount", err)
 	}

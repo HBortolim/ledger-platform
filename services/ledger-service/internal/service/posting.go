@@ -49,7 +49,7 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 	for i, e := range in.Entries {
 		amount, err := domain.NewMoney(e.Amount)
 		if err != nil {
-			return domain.LedgerTransaction{}, ErrInvalidAmount{Reason: err.Error()}
+			return domain.LedgerTransaction{}, domain.ErrInvalidAmount{Reason: err.Error()}
 		}
 		entries[i] = domain.LedgerEntry{
 			ID:            uuid.New(),
@@ -67,7 +67,7 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 		Entries:     entries,
 	}
 	if err := tx.ValidateBalance(); err != nil {
-		return domain.LedgerTransaction{}, ErrUnbalanced{Message: err.Error()}
+		return domain.LedgerTransaction{}, domain.ErrUnbalanced{Message: err.Error()}
 	}
 
 	status := "error"

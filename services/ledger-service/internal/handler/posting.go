@@ -117,8 +117,8 @@ func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
 	var dupErr          domain.ErrDuplicateTransaction
 	var insufficientErr domain.ErrInsufficientFunds
 	var dailyCapErr domain.ErrDailyCapExceeded
-	var unbalancedErr service.ErrUnbalanced
-	var invalidAmountErr service.ErrInvalidAmount
+	var unbalancedErr domain.ErrUnbalanced
+	var invalidAmountErr domain.ErrInvalidAmount
 
 	switch {
 	case errors.As(err, &dupErr):
