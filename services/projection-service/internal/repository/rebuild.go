@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/ledger-platform/projection-service/internal/sequence"
 	"github.com/ledger-platform/projection-service/internal/utils"
 )
 
@@ -31,52 +32,40 @@ func (r *RebuildRepository) Rebuild(ctx context.Context, walletID uuid.UUID) (ut
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	// Lock the wallet's row BEFORE reading the ledger. A concurrent consumer apply for this
-	// wallet blocks on this same row until we commit, then re-evaluates its last_entry_id
-	// guard against the balance we just wrote -- so a delta the consumer folds in either lands
-	// before our ledger read (we see it and it's a no-op for the consumer) or after our commit
-	// (the consumer applies it on top, since its last_entry_id differs from ours).
-	//
-	// Residual gap, stated honestly: this locks one wallet's projection row, not the ledger
-	// itself. An entry committed to the ledger between our SELECT below and our commit is not
-	// lost -- the consumer picks it up afterwards -- but if the consumer had already applied an
-	// entry that our own read re-derives (e.g. during a lagging consumer), the guard's single
-	// last_entry_id cannot tell "already applied" from "not yet applied" and can double-count.
-	// See Task 08 (per-wallet entry sequence) for the fix; this task only closes the race this
-	// lock is built to close.
-	if _, err := tx.Exec(ctx,
-		`SELECT 1 FROM projection_db.wallet_balances WHERE wallet_id = $1 FOR UPDATE`,
-		walletID); err != nil {
-		return utils.Result{}, fmt.Errorf("lock wallet %s balance row: %w", walletID, err)
+	// Lock the wallet's row BEFORE reading the ledger, creating it first if it does not exist yet
+	// (sequence.LockWallet) so there is always a row to lock. A concurrent consumer apply for this
+	// wallet then blocks on this same row until we commit and re-reads last_seq, which is the
+	// watermark we are about to write: it skips what our ledger read already covers and applies
+	// anything newer on top. Replay is therefore exact even while the consumer lags (Task 08).
+	if _, err := sequence.LockWallet(ctx, tx, walletID); err != nil {
+		return utils.Result{}, err
 	}
 
-	if _, err := tx.Exec(ctx,
-		`DELETE FROM projection_db.wallet_balances WHERE wallet_id = $1`,
-		walletID); err != nil {
-		return utils.Result{}, fmt.Errorf("clear wallet %s balance row: %w", walletID, err)
-	}
-
+	// seq is the true per-wallet order: (created_at, id) was only a best effort.
 	rows, err := tx.Query(ctx, `
-		SELECT id, entry_type, amount::text
+		SELECT id, entry_type, amount::text, seq
 		  FROM ledger_db.ledger_entries
 		 WHERE account_id = $1
-		 ORDER BY created_at, id`,
+		 ORDER BY seq`,
 		walletID)
 	if err != nil {
 		return utils.Result{}, fmt.Errorf("read ledger entries for wallet %s: %w", walletID, err)
 	}
 	defer rows.Close()
 
+	var balanceTxt string
 	balance := decimal.Zero
 	applied := 0
 	var lastEntryID *uuid.UUID
+	var lastSeq int64
 	for rows.Next() {
 		var (
 			entryID   uuid.UUID
 			entryType string
 			amountTxt string
+			seq       int64
 		)
-		if err := rows.Scan(&entryID, &entryType, &amountTxt); err != nil {
+		if err := rows.Scan(&entryID, &entryType, &amountTxt, &seq); err != nil {
 			return utils.Result{}, fmt.Errorf("scan ledger entry for wallet %s: %w", walletID, err)
 		}
 		amount, err := decimal.NewFromString(amountTxt)
@@ -86,23 +75,49 @@ func (r *RebuildRepository) Rebuild(ctx context.Context, walletID uuid.UUID) (ut
 		balance = balance.Add(utils.SignedDelta(entryType, amount))
 		applied++
 		lastEntryID = &entryID
+		lastSeq = seq
 	}
 	if err := rows.Err(); err != nil {
 		return utils.Result{}, fmt.Errorf("iterate ledger entries for wallet %s: %w", walletID, err)
 	}
+	rows.Close()
 
+	// Replace the row's values (not merge) and set the watermark to the highest seq replayed (SEQ-8).
 	var rebuiltAt time.Time
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO projection_db.wallet_balances (wallet_id, balance, last_entry_id, last_applied_at, updated_at)
-		VALUES ($1, $2::numeric, $3, now(), now())
-		ON CONFLICT (wallet_id) DO UPDATE
-		   SET balance = EXCLUDED.balance,
-		       last_entry_id = EXCLUDED.last_entry_id,
+		UPDATE projection_db.wallet_balances
+		   SET balance = $2::numeric,
+		       last_entry_id = $3,
+		       last_seq = $4,
 		       last_applied_at = now(), updated_at = now()
+		 WHERE wallet_id = $1
 		RETURNING updated_at`,
-		walletID, balance.StringFixed(2), lastEntryID,
+		walletID, balance.StringFixed(2), lastEntryID, lastSeq,
 	).Scan(&rebuiltAt); err != nil {
 		return utils.Result{}, fmt.Errorf("write rebuilt balance for wallet %s: %w", walletID, err)
+	}
+
+	// Parked entries at or below the watermark are covered by the replay: discard them. Those
+	// that are now contiguous with it are applied by the same drain the consumer uses (SEQ-8).
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM projection_db.pending_entries WHERE wallet_id = $1 AND seq <= $2`,
+		walletID, lastSeq); err != nil {
+		return utils.Result{}, fmt.Errorf("discard covered parked entries of wallet %s: %w", walletID, err)
+	}
+	drained, err := sequence.Drain(ctx, tx, walletID, lastSeq)
+	if err != nil {
+		return utils.Result{}, err
+	}
+	if drained > 0 {
+		if err := tx.QueryRow(ctx,
+			`SELECT balance::text, updated_at FROM projection_db.wallet_balances WHERE wallet_id = $1`,
+			walletID).Scan(&balanceTxt, &rebuiltAt); err != nil {
+			return utils.Result{}, fmt.Errorf("re-read rebuilt balance of wallet %s: %w", walletID, err)
+		}
+		if balance, err = decimal.NewFromString(balanceTxt); err != nil {
+			return utils.Result{}, fmt.Errorf("parse rebuilt balance %q: %w", balanceTxt, err)
+		}
+		applied += drained
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -632,7 +632,7 @@ Unlike §7.1, this is a read path over derived, eventually-consistent state, not
 
 ### 7.3 Event schemas
 
-All events are JSON, schema versioned via a `schemaVersion` field. Kafka key is the wallet ID for entries that pertain to a specific wallet, the transaction ID otherwise. Partitioning by wallet ID ensures all events for one wallet land on the same partition and are processed in order.
+All events are JSON, schema versioned via a `schemaVersion` field. `LEDGER_POSTED` is keyed by transaction ID, because one transaction touches two wallets and a record has one key. **Events for one wallet therefore land on different partitions and may be consumed out of order.** Consumers must not rely on arrival order; `LEDGER_POSTED` carries a per-wallet sequence number (`seq`) for exactly that reason (see below and ADR-0017).
 
 #### `LEDGER_POSTED`
 
@@ -643,18 +643,20 @@ Consumed by: Projection Service, Notification Service
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "eventId": "uuid",
   "eventType": "LEDGER_POSTED",
   "occurredAt": "2026-05-19T14:23:00.123Z",
   "transactionId": "uuid",
   "transactionType": "TRANSFER",
   "entries": [
-    {"entryId": "uuid", "accountId": "uuid", "entryType": "DEBIT",  "amount": "100.00"},
-    {"entryId": "uuid", "accountId": "uuid", "entryType": "CREDIT", "amount": "100.00"}
+    {"entryId": "uuid", "accountId": "uuid", "entryType": "DEBIT",  "amount": "100.00", "seq": 41},
+    {"entryId": "uuid", "accountId": "uuid", "entryType": "CREDIT", "amount": "100.00", "seq": 7}
   ]
 }
 ```
+
+`seq` (schemaVersion 2) is the entry's 1-based position in its **account's** history: the Ledger Service numbers each account's entries `1, 2, 3, …` in commit order, assigned under the account's row lock, so numbers are gap-free and unique per account. It is per entry, not per event: a transfer's debit and credit carry each wallet's own number. A consumer applies an entry only when `seq = last_applied + 1`, skips `seq <= last_applied`, and parks anything ahead of a gap until the missing entries arrive. Version 1 events (no `seq`) published before this change may still be in the topic; the Projection Service resolves their `seq` from the ledger.
 
 #### `BALANCE_UPDATED`
 
@@ -686,7 +688,9 @@ Consumed by: Notification Service
 | Ledger | `ledger_outbox_depth` | gauge | — |
 | Ledger | `ledger_outbox_publish_failures_total` | counter | reason |
 | Projection | `projection_lag_seconds` | gauge | wallet_id (low cardinality? see note) |
-| Projection | `projection_events_processed_total` | counter | result (applied/skipped/error) |
+| Projection | `projection_events_processed_total` | counter | result (applied/skipped/parked/error) |
+| Projection | `projection_pending_entries` | gauge | — |
+| Projection | `projection_seq_gaps_total` | counter | — |
 | Projection | `projection_consumer_lag` | gauge | topic, partition |
 
 Note on cardinality: `projection_lag_seconds` per wallet would explode. Track it as a histogram across all wallets and a separate `max_projection_lag_seconds` gauge.

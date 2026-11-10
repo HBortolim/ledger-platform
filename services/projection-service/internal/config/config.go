@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -11,6 +12,10 @@ type Config struct {
 	KafkaBrokers []string
 	KafkaGroupID string
 	AppPort      string
+
+	// PendingEntryAlertAfter is how long an entry may sit in pending_entries before the consumer
+	// logs an error naming the wallet and the missing seq (Task 08, SEQ-9).
+	PendingEntryAlertAfter time.Duration
 }
 
 const (
@@ -39,11 +44,24 @@ func Load() (*Config, error) {
 		port = defaultPort
 	}
 
+	alertAfterStr := os.Getenv("PENDING_ENTRY_ALERT_AFTER")
+	if alertAfterStr == "" {
+		alertAfterStr = "30s"
+	}
+	alertAfter, err := time.ParseDuration(alertAfterStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid PENDING_ENTRY_ALERT_AFTER %q: %w", alertAfterStr, err)
+	}
+	if alertAfter <= 0 {
+		return nil, fmt.Errorf("invalid PENDING_ENTRY_ALERT_AFTER %q: must be positive", alertAfterStr)
+	}
+
 	return &Config{
-		DatabaseURL:  dbURL,
-		KafkaBrokers: strings.Split(brokers, ","),
-		KafkaGroupID: groupID,
-		AppPort:      ":" + port,
+		DatabaseURL:            dbURL,
+		KafkaBrokers:           strings.Split(brokers, ","),
+		KafkaGroupID:           groupID,
+		AppPort:                ":" + port,
+		PendingEntryAlertAfter: alertAfter,
 	}, nil
 
 }

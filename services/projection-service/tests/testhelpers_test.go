@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,7 @@ func seedLedgerSchema(t *testing.T, ownerDSN string) {
 			account_id      UUID NOT NULL,
 			entry_type      VARCHAR(8) NOT NULL CHECK (entry_type IN ('DEBIT','CREDIT')),
 			amount          NUMERIC(19, 2) NOT NULL CHECK (amount > 0),
+			seq             BIGINT NOT NULL,
 			created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`,
 	} {
@@ -207,6 +209,24 @@ type entryFixture struct {
 	AccountID uuid.UUID
 	EntryType string // DEBIT | CREDIT
 	Amount    string // 2dp string, e.g. "100.00"
+	// Seq is the entry's per-account sequence number. Zero means "the next number for this
+	// account", assigned by the helper so tests that do not care about ordering stay terse.
+	Seq int64
+	// V1 simulates an event published before Task 08: no seq on the wire (schemaVersion 1).
+	V1 bool
+}
+
+var (
+	autoSeqMu sync.Mutex
+	autoSeq   = map[uuid.UUID]int64{}
+)
+
+// nextAutoSeq hands out 1, 2, 3, ... per account across the helper's calls.
+func nextAutoSeq(account uuid.UUID) int64 {
+	autoSeqMu.Lock()
+	defer autoSeqMu.Unlock()
+	autoSeq[account]++
+	return autoSeq[account]
 }
 
 // produceLedgerPosted publishes a LEDGER_POSTED message to bootstrap using
@@ -222,6 +242,7 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 		AccountID uuid.UUID `json:"accountId"`
 		EntryType string    `json:"entryType"`
 		Amount    string    `json:"amount"`
+		Seq       int64     `json:"seq"`
 	}
 	type payload struct {
 		SchemaVersion   int            `json:"schemaVersion"`
@@ -233,12 +254,21 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 		Entries         []entryPayload `json:"entries"`
 	}
 
+	schemaVersion := 2
+	if len(entries) > 0 && entries[0].V1 {
+		schemaVersion = 1
+	}
 	eps := make([]entryPayload, len(entries))
 	for i, e := range entries {
-		eps[i] = entryPayload(e)
+		if e.V1 {
+			e.Seq = 0
+		} else if e.Seq == 0 {
+			e.Seq = nextAutoSeq(e.AccountID)
+		}
+		eps[i] = entryPayload{EntryID: e.EntryID, AccountID: e.AccountID, EntryType: e.EntryType, Amount: e.Amount, Seq: e.Seq}
 	}
 	body, err := json.Marshal(payload{
-		SchemaVersion:   1,
+		SchemaVersion:   schemaVersion,
 		EventID:         uuid.New(),
 		EventType:       "LEDGER_POSTED",
 		OccurredAt:      occurredAt,

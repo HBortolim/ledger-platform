@@ -4,34 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/shopspring/decimal"
 
+	"github.com/ledger-platform/projection-service/internal/sequence"
 	"github.com/ledger-platform/projection-service/internal/utils"
 )
-
-// applyEntry idempotently applies one entry's signed delta to
-// projection_db.wallet_balances. The WHERE clause on the ON CONFLICT branch
-// makes a redelivery of the same entryID a no-op: applied reports whether
-// this call actually changed the row (false means "already applied").
-func applyEntry(ctx context.Context, tx pgx.Tx, walletID, entryID uuid.UUID, delta decimal.Decimal) (applied bool, err error) {
-	tag, err := tx.Exec(ctx, `
-		INSERT INTO projection_db.wallet_balances (wallet_id, balance, last_entry_id, last_applied_at, updated_at)
-		VALUES ($1, $2::numeric, $3, now(), now())
-		ON CONFLICT (wallet_id) DO UPDATE
-		   SET balance = wallet_balances.balance + EXCLUDED.balance,
-		       last_entry_id = EXCLUDED.last_entry_id,
-		       last_applied_at = now(), updated_at = now()
-		 WHERE wallet_balances.last_entry_id IS DISTINCT FROM EXCLUDED.last_entry_id`,
-		walletID, delta.StringFixed(2), entryID,
-	)
-	if err != nil {
-		return false, fmt.Errorf("apply entry %s to wallet %s: %w", entryID, walletID, err)
-	}
-	return tag.RowsAffected() > 0, nil
-}
 
 // upsertOffset records the last-processed offset for a consumer group. The
 // schema's primary key is consumer_group alone (SPEC.md §6.3), so this row
@@ -56,42 +34,77 @@ func upsertOffset(ctx context.Context, tx pgx.Tx, group, topic string, partition
 	return nil
 }
 
-// applyEvent applies every entry in event within one DB transaction, records
-// the consumer's last-processed offset in the same transaction, and commits.
-// The whole event is classified as a single outcome, "applied" or "skipped" —
-// matching the granularity of metrics.EventsProcessedTotal's "error" label,
-// which is already per-message (a poison message has no entries to count).
-// Because every entry in one event commits together in this one transaction,
-// an event is never partially applied across delivery attempts: on first
-// delivery every entry is newly applied ("applied"); on redelivery every
-// entry was already applied by the prior commit ("skipped").
-func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent, group, topic string, partition int32, offset int64) (result string, err error) {
+// eventResult is what applyEvent did, for the caller's metrics.
+type eventResult struct {
+	Outcome     string // applied | parked | skipped
+	NewlyParked int    // entries newly parked behind a gap (SEQ-6)
+	Touched     bool   // anything was parked or drained, so pending_entries may have changed
+}
+
+// resolveSeq returns the entry's per-account sequence number. A schemaVersion 2 event carries
+// it; a schemaVersion 1 event (published before Task 08, possibly still in Kafka) does not, so
+// it is looked up from the ledger -- the entry is committed, so it exists. After this lookup a
+// v1 entry takes exactly the same path as a v2 one: there is one dedupe rule, not two.
+// TODO: delete the lookup once no v1 event can remain within the topic's retention.
+func resolveSeq(ctx context.Context, tx pgx.Tx, e entryEvent) (int64, error) {
+	if e.Seq > 0 {
+		return e.Seq, nil
+	}
+	var seq int64
+	if err := tx.QueryRow(ctx,
+		`SELECT seq FROM ledger_db.ledger_entries WHERE id = $1`, e.EntryID).Scan(&seq); err != nil {
+		return 0, fmt.Errorf("look up seq of v1 entry %s: %w", e.EntryID, err)
+	}
+	return seq, nil
+}
+
+// applyEvent applies every entry in event within one DB transaction, records the consumer's
+// last-processed offset in the same transaction, and commits. Each entry is applied, skipped or
+// parked by sequence.ApplyEntry (SEQ-4..SEQ-7). The whole event is classified as a single
+// outcome, matching the granularity of metrics.EventsProcessedTotal: "applied" if any entry
+// applied (including parked ones its arrival unblocked), "parked" if none applied and any was
+// parked, otherwise "skipped".
+func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent, group, topic string, partition int32, offset int64) (eventResult, error) {
 	dbtx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return "", fmt.Errorf("begin tx: %w", err)
+		return eventResult{}, fmt.Errorf("begin tx: %w", err)
 	}
 	defer dbtx.Rollback(ctx) //nolint:errcheck
 
-	anyApplied := false
+	var applied, newlyParked int
+	touched := false
 	for _, e := range event.Entries {
-		ok, err := applyEntry(ctx, dbtx, e.AccountID, e.EntryID, utils.SignedDelta(e.EntryType, e.Amount))
+		seq, err := resolveSeq(ctx, dbtx, e)
 		if err != nil {
-			return "", err
+			return eventResult{}, err
 		}
-		if ok {
-			anyApplied = true
+		out, err := sequence.ApplyEntry(ctx, dbtx, e.AccountID, e.EntryID, seq, utils.SignedDelta(e.EntryType, e.Amount))
+		if err != nil {
+			return eventResult{}, err
+		}
+		applied += out.Applied
+		if out.Parked {
+			newlyParked++
+		}
+		if out.Parked || out.Applied > 1 {
+			touched = true
 		}
 	}
 
 	if err := upsertOffset(ctx, dbtx, group, topic, partition, offset); err != nil {
-		return "", err
+		return eventResult{}, err
 	}
 
 	if err := dbtx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("commit projection apply: %w", err)
+		return eventResult{}, fmt.Errorf("commit projection apply: %w", err)
 	}
-	if anyApplied {
-		return "applied", nil
+
+	res := eventResult{NewlyParked: newlyParked, Touched: touched, Outcome: "skipped"}
+	switch {
+	case applied > 0:
+		res.Outcome = "applied"
+	case newlyParked > 0:
+		res.Outcome = "parked"
 	}
-	return "skipped", nil
+	return res, nil
 }

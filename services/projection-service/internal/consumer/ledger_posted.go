@@ -54,6 +54,7 @@ type LedgerPostedConsumer struct {
 	pool         *pgxpool.Pool
 	kafkaBrokers []string
 	groupID      string
+	alertAfter   time.Duration // a parked entry older than this is a gap that did not fill (SEQ-9)
 
 	client *kgo.Client
 	admin  *kadm.Client
@@ -64,6 +65,7 @@ func NewLedgerPostedConsumer(pool *pgxpool.Pool, cfg *config.Config) *LedgerPost
 		pool:         pool,
 		kafkaBrokers: cfg.KafkaBrokers,
 		groupID:      cfg.KafkaGroupID,
+		alertAfter:   cfg.PendingEntryAlertAfter,
 	}
 }
 
@@ -102,6 +104,8 @@ func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 		os.Exit(1)
 	}
 	defer c.Close()
+
+	go c.reportPendingLoop(ctx)
 
 	slog.InfoContext(ctx, "projection consumer started")
 	for {
@@ -169,7 +173,7 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 		return
 	}
 
-	result, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
+	res, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
 	if err != nil {
 		slog.ErrorContext(ctx, "projection consumer: apply failed, will retry",
 			slog.String("transaction_id", event.TransactionID.String()),
@@ -180,9 +184,13 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 	}
 	slog.InfoContext(ctx, "projection consumer: apply succeeded",
 		slog.String("transaction_id", event.TransactionID.String()),
-		slog.String("result", result),
+		slog.String("result", res.Outcome),
 		slog.Int64("offset", r.Offset))
-	metrics.EventsProcessedTotal.WithLabelValues(result).Inc()
+	metrics.EventsProcessedTotal.WithLabelValues(res.Outcome).Inc()
+	metrics.SeqGapsTotal.Add(float64(res.NewlyParked))
+	if res.Touched {
+		c.refreshPendingGauge(ctx)
+	}
 
 	lag := max(time.Since(event.OccurredAt).Seconds(), 0)
 	metrics.LagSeconds.Observe(lag)

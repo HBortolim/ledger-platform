@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -25,15 +24,33 @@ func insertLedgerEntry(t *testing.T, owner *pgxpool.Pool, accountID uuid.UUID, e
 	return id
 }
 
+// insertLedgerEntryWithID numbers the entry as the account's next (MAX(seq)+1), the way the
+// Ledger Service's Post would have.
 func insertLedgerEntryWithID(t *testing.T, owner *pgxpool.Pool, id, accountID uuid.UUID, entryType, amount string, createdAt time.Time) {
 	t.Helper()
 	_, err := owner.Exec(context.Background(), `
-		INSERT INTO ledger_db.ledger_entries (id, transaction_id, account_id, entry_type, amount, created_at)
-		VALUES ($1, $2, $3, $4, $5::numeric, $6)`,
+		INSERT INTO ledger_db.ledger_entries (id, transaction_id, account_id, entry_type, amount, seq, created_at)
+		VALUES ($1, $2, $3, $4, $5::numeric,
+		        (SELECT COALESCE(MAX(seq), 0) + 1 FROM ledger_db.ledger_entries WHERE account_id = $3), $6)`,
 		id, uuid.New(), accountID, entryType, amount, createdAt)
 	if err != nil {
 		t.Fatalf("insert ledger entry: %v", err)
 	}
+}
+
+// insertLedgerEntrySeq writes an entry with an explicit seq, for tests where replay order must
+// disagree with insertion order and timestamps.
+func insertLedgerEntrySeq(t *testing.T, owner *pgxpool.Pool, accountID uuid.UUID, seq int64, entryType, amount string, createdAt time.Time) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	_, err := owner.Exec(context.Background(), `
+		INSERT INTO ledger_db.ledger_entries (id, transaction_id, account_id, entry_type, amount, seq, created_at)
+		VALUES ($1, $2, $3, $4, $5::numeric, $6, $7)`,
+		id, uuid.New(), accountID, entryType, amount, seq, createdAt)
+	if err != nil {
+		t.Fatalf("insert ledger entry (seq %d): %v", seq, err)
+	}
+	return id
 }
 
 // seedWalletBalance plants a projection row directly, standing in for a corrupted (or stale) one.
@@ -57,6 +74,17 @@ func lastEntryID(t *testing.T, pool *pgxpool.Pool, walletID uuid.UUID) *uuid.UUI
 		t.Fatalf("read last_entry_id for %s: %v", walletID, err)
 	}
 	return id
+}
+
+// lastSeqOf returns wallet_balances.last_seq.
+func lastSeqOf(t *testing.T, pool *pgxpool.Pool, walletID uuid.UUID) int64 {
+	t.Helper()
+	var n int64
+	if err := pool.QueryRow(context.Background(),
+		`SELECT last_seq FROM projection_db.wallet_balances WHERE wallet_id = $1`, walletID).Scan(&n); err != nil {
+		t.Fatalf("read last_seq for %s: %v", walletID, err)
+	}
+	return n
 }
 
 func equalUUIDPtr(got *uuid.UUID, want uuid.UUID) bool {
@@ -104,40 +132,25 @@ func TestRebuild(t *testing.T) {
 		}
 	})
 
-	t.Run("last_entry_id is the chronologically last entry, not the last inserted", func(t *testing.T) {
+	// Task 08: replay follows seq (the true per-wallet commit order), not created_at -- which is
+	// the transaction START time and can disagree with commit order -- and not the uuid.
+	t.Run("replay follows seq, not created_at or insertion order", func(t *testing.T) {
 		wallet := uuid.New()
-		// Insert the LATER entry first. Without ORDER BY created_at a sequential scan returns
-		// insertion order and would pick the earlier entry as "last".
-		later := insertLedgerEntry(t, owner, wallet, "CREDIT", "10.00", base.Add(time.Minute))
-		insertLedgerEntry(t, owner, wallet, "CREDIT", "5.00", base)
+		// Inserted out of order, with timestamps that point the opposite way to seq: the entry
+		// with the HIGHEST seq has the EARLIEST created_at.
+		third := insertLedgerEntrySeq(t, owner, wallet, 3, "CREDIT", "1.00", base)
+		insertLedgerEntrySeq(t, owner, wallet, 1, "CREDIT", "1.00", base.Add(2*time.Minute))
+		insertLedgerEntrySeq(t, owner, wallet, 2, "CREDIT", "1.00", base.Add(time.Minute))
 
 		if _, err := repo.Rebuild(ctx, wallet); err != nil {
 			t.Fatalf("Rebuild() = error %v, want nil", err)
 		}
 
-		if got := lastEntryID(t, app, wallet); !equalUUIDPtr(got, later) {
-			t.Errorf("last_entry_id = %v, want %s (the entry with the later created_at)", got, later)
+		if got := lastEntryID(t, app, wallet); !equalUUIDPtr(got, third) {
+			t.Errorf("last_entry_id = %v, want %s (the entry with the highest seq)", got, third)
 		}
-	})
-
-	t.Run("entries sharing a timestamp are ordered by id", func(t *testing.T) {
-		wallet := uuid.New()
-		// Several entries share a created_at inside one posting. (created_at, id) makes the
-		// replay -- and therefore last_entry_id -- deterministic. Postgres orders uuid bytewise.
-		a, b := uuid.New(), uuid.New()
-		if bytes.Compare(a[:], b[:]) > 0 {
-			a, b = b, a // a < b
-		}
-		// Insert the greater id FIRST, so insertion order and id order disagree.
-		insertLedgerEntryWithID(t, owner, b, wallet, "CREDIT", "1.00", base)
-		insertLedgerEntryWithID(t, owner, a, wallet, "CREDIT", "1.00", base)
-
-		if _, err := repo.Rebuild(ctx, wallet); err != nil {
-			t.Fatalf("Rebuild() = error %v, want nil", err)
-		}
-
-		if got := lastEntryID(t, app, wallet); !equalUUIDPtr(got, b) {
-			t.Errorf("last_entry_id = %v, want %s (greater id wins the tie)", got, b)
+		if got := lastSeqOf(t, app, wallet); got != 3 {
+			t.Errorf("last_seq = %d, want 3", got)
 		}
 	})
 

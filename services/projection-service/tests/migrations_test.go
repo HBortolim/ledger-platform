@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/ory/dockertest/v3"
@@ -206,5 +207,69 @@ func TestMigration0005_GrantsLedgerAppReadOnly_AndRollsBack(t *testing.T) {
 	}
 	if _, err := ledgerApp.Exec(ctx, `SELECT count(*) FROM projection_db.wallet_balances`); err != nil {
 		t.Errorf("after re-applying 0005, ledger_app SELECT = %v, want nil", err)
+	}
+}
+
+// TestMigration0006_AlignsWatermark_AndGrantsPendingEntriesNarrowly covers Task 08's projection
+// migration: last_seq is backfilled from the entry each wallet last applied, projection_app gets
+// exactly SELECT/INSERT/DELETE on pending_entries (parked entries are never updated in place),
+// and .down/.up round-trips.
+func TestMigration0006_AlignsWatermark_AndGrantsPendingEntriesNarrowly(t *testing.T) {
+	ownerDSN, appDSN := setupProjectionDB(t) // already migrated, 0006 included
+	owner := connectPool(t, ownerDSN)
+	app := connectPool(t, appDSN)
+	ctx := context.Background()
+
+	m, err := migrate.New("file://../migrations", ownerDSN+"&x-migrations-table=projection_schema_migrations")
+	if err != nil {
+		t.Fatalf("could not init migrate: %v", err)
+	}
+	if err := m.Migrate(5); err != nil {
+		t.Fatalf("rolling back to 0005: %v", err)
+	}
+
+	// A wallet whose projection last applied ledger entry seq 7, and one with no entry applied.
+	applied, untouched, entryID := uuid.New(), uuid.New(), uuid.New()
+	if _, err := owner.Exec(ctx, `INSERT INTO ledger_db.ledger_entries (id, transaction_id, account_id, entry_type, amount, seq)
+		VALUES ($1, gen_random_uuid(), $2, 'CREDIT', 5, 7)`, entryID, applied); err != nil {
+		t.Fatalf("seed ledger entry: %v", err)
+	}
+	for _, w := range []struct {
+		id    uuid.UUID
+		entry *uuid.UUID
+	}{{applied, &entryID}, {untouched, nil}} {
+		if _, err := owner.Exec(ctx, `INSERT INTO projection_db.wallet_balances (wallet_id, balance, last_entry_id) VALUES ($1, 5, $2)`, w.id, w.entry); err != nil {
+			t.Fatalf("seed wallet: %v", err)
+		}
+	}
+
+	if err := m.Up(); err != nil {
+		t.Fatalf("applying 0006: %v", err)
+	}
+	for wallet, want := range map[uuid.UUID]int64{applied: 7, untouched: 0} {
+		var got int64
+		if err := owner.QueryRow(ctx, `SELECT last_seq FROM projection_db.wallet_balances WHERE wallet_id = $1`, wallet).Scan(&got); err != nil || got != want {
+			t.Errorf("last_seq of %s = %d, err=%v, want %d", wallet, got, err, want)
+		}
+	}
+
+	if _, err := app.Exec(ctx, `INSERT INTO projection_db.pending_entries (wallet_id, seq, entry_id, delta) VALUES ($1, 9, $2, 1)`, applied, uuid.New()); err != nil {
+		t.Errorf("projection_app INSERT on pending_entries = %v, want nil", err)
+	}
+	if _, err := app.Exec(ctx, `SELECT count(*) FROM projection_db.pending_entries`); err != nil {
+		t.Errorf("projection_app SELECT on pending_entries = %v, want nil", err)
+	}
+	if _, err := app.Exec(ctx, `UPDATE projection_db.pending_entries SET delta = 2`); !permissionDenied(err) {
+		t.Errorf("projection_app UPDATE on pending_entries = %v, want permission denied (42501)", err)
+	}
+	if _, err := app.Exec(ctx, `DELETE FROM projection_db.pending_entries`); err != nil {
+		t.Errorf("projection_app DELETE on pending_entries = %v, want nil", err)
+	}
+
+	if err := m.Migrate(5); err != nil {
+		t.Fatalf("rolling 0006 back: %v", err)
+	}
+	if err := m.Up(); err != nil {
+		t.Fatalf("re-applying 0006: %v", err)
 	}
 }
