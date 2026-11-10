@@ -21,7 +21,6 @@ import (
 	"github.com/ledger-platform/ledger-service/internal/domain"
 )
 
-
 var systemFundingAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 // testDailyCap is the shared, generously-high daily transfer cap used by tests that don't

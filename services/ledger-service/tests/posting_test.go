@@ -432,7 +432,7 @@ func TestPostingRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("RegularAccountFunding/SubjectToDailyCap", func(t *testing.T){
+	t.Run("RegularAccountFunding/SubjectToDailyCap", func(t *testing.T) {
 		var dailyCap domain.ErrDailyCapExceeded
 
 		cappedRepo := repository.NewPostingRepository(pool, decimal.RequireFromString("100.00"), systemFundingAccountID)

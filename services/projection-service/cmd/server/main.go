@@ -15,10 +15,10 @@ import (
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/consumer"
 	"github.com/ledger-platform/projection-service/internal/handler"
-	"github.com/ledger-platform/projection-service/internal/service"
-	"github.com/ledger-platform/projection-service/internal/repository"
 	"github.com/ledger-platform/projection-service/internal/logging"
 	"github.com/ledger-platform/projection-service/internal/observability"
+	"github.com/ledger-platform/projection-service/internal/repository"
+	"github.com/ledger-platform/projection-service/internal/service"
 )
 
 func main() {

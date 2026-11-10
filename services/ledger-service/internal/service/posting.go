@@ -78,9 +78,9 @@ func (s *PostingService) Post(ctx context.Context, in PostInput) (domain.LedgerT
 		metrics.PostingsTotal.WithLabelValues(string(tx.Type), status).Inc()
 	}()
 
-	var dupErr          domain.ErrDuplicateTransaction
+	var dupErr domain.ErrDuplicateTransaction
 	var insufficientErr domain.ErrInsufficientFunds
-	var dailyCapErr     domain.ErrDailyCapExceeded
+	var dailyCapErr domain.ErrDailyCapExceeded
 
 	switch {
 	case postErr == nil:

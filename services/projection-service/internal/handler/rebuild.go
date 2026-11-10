@@ -34,12 +34,12 @@ func (h *RebuildHandler) Rebuild(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "rebuild failed"})
 		return
-      }
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"walletId": result.WalletID,
-		"balance":  result.Balance.StringFixed(2),
+		"walletId":       result.WalletID,
+		"balance":        result.Balance.StringFixed(2),
 		"entriesApplied": result.EntriesApplied,
-		"rebuiltAt": result.RebuiltAt,
+		"rebuiltAt":      result.RebuiltAt,
 	})
 }

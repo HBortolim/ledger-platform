@@ -69,8 +69,10 @@ func TestPost_Success_ReturnsRepersistedTransactionFromRepo(t *testing.T) {
 func TestPost_UnbalancedEntries_ReturnsErrUnbalanced_WithoutCallingRepo(t *testing.T) {
 	debit, credit := uuid.New(), uuid.New()
 	repo := &fakeRepo{
-		postFunc:    func(ctx context.Context, tx domain.LedgerTransaction) error { return nil },
-		getByIDFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) { return domain.LedgerTransaction{}, nil },
+		postFunc: func(ctx context.Context, tx domain.LedgerTransaction) error { return nil },
+		getByIDFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
+			return domain.LedgerTransaction{}, nil
+		},
 	}
 	svc := NewPostingService(repo)
 
@@ -95,8 +97,10 @@ func TestPost_UnbalancedEntries_ReturnsErrUnbalanced_WithoutCallingRepo(t *testi
 func TestPost_InvalidAmount_ReturnsErrInvalidAmount_WithoutCallingRepo(t *testing.T) {
 	debit, credit := uuid.New(), uuid.New()
 	repo := &fakeRepo{
-		postFunc:    func(ctx context.Context, tx domain.LedgerTransaction) error { return nil },
-		getByIDFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) { return domain.LedgerTransaction{}, nil },
+		postFunc: func(ctx context.Context, tx domain.LedgerTransaction) error { return nil },
+		getByIDFunc: func(ctx context.Context, id uuid.UUID) (domain.LedgerTransaction, error) {
+			return domain.LedgerTransaction{}, nil
+		},
 	}
 	svc := NewPostingService(repo)
 
