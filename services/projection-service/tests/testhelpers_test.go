@@ -236,7 +236,17 @@ func nextAutoSeq(account uuid.UUID) int64 {
 // instance, keeps this suite independent of ledger internals.
 func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID, occurredAt time.Time, entries []entryFixture, traceparent string) {
 	t.Helper()
+	produceRecord(t, bootstrap, &kgo.Record{
+		Topic:   "ledger.posted.v1",
+		Key:     []byte(transactionID.String()),
+		Value:   ledgerPostedBody(t, transactionID, occurredAt, entries),
+		Headers: traceHeaders(traceparent),
+	}, false)
+}
 
+// ledgerPostedBody builds the §7.3 LEDGER_POSTED envelope the Ledger Service's outbox produces.
+func ledgerPostedBody(t *testing.T, transactionID uuid.UUID, occurredAt time.Time, entries []entryFixture) []byte {
+	t.Helper()
 	type entryPayload struct {
 		EntryID   uuid.UUID `json:"entryId"`
 		AccountID uuid.UUID `json:"accountId"`
@@ -279,26 +289,45 @@ func produceLedgerPosted(t *testing.T, bootstrap string, transactionID uuid.UUID
 	if err != nil {
 		t.Fatalf("marshal ledger posted payload: %v", err)
 	}
+	return body
+}
 
-	producer, err := kgo.NewClient(kgo.SeedBrokers(bootstrap), kgo.ClientID("test-producer"))
+// produceLedgerPostedToPartition publishes like produceLedgerPosted but to an explicit
+// partition, for tests that need to place events on specific partitions.
+func produceLedgerPostedToPartition(t *testing.T, bootstrap string, partition int32, entries []entryFixture) {
+	t.Helper()
+	txID := uuid.New()
+	produceRecord(t, bootstrap, &kgo.Record{
+		Topic:     "ledger.posted.v1",
+		Key:       []byte(txID.String()),
+		Value:     ledgerPostedBody(t, txID, time.Now().UTC(), entries),
+		Partition: partition,
+	}, true)
+}
+
+func traceHeaders(traceparent string) []kgo.RecordHeader {
+	if traceparent == "" {
+		return nil
+	}
+	return []kgo.RecordHeader{{Key: "traceparent", Value: []byte(traceparent)}}
+}
+
+// produceRecord synchronously produces one record; manual honours rec.Partition.
+func produceRecord(t *testing.T, bootstrap string, rec *kgo.Record, manual bool) {
+	t.Helper()
+	opts := []kgo.Opt{kgo.SeedBrokers(bootstrap), kgo.ClientID("test-producer")}
+	if manual {
+		opts = append(opts, kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	}
+	producer, err := kgo.NewClient(opts...)
 	if err != nil {
 		t.Fatalf("kgo.NewClient() (producer) = error %v, want nil", err)
 	}
 	defer producer.Close()
 
-	var hdrs []kgo.RecordHeader
-	if traceparent != "" {
-		hdrs = []kgo.RecordHeader{{Key: "traceparent", Value: []byte(traceparent)}}
-	}
-
 	produceCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res := producer.ProduceSync(produceCtx, &kgo.Record{
-		Topic:   "ledger.posted.v1",
-		Key:     []byte(transactionID.String()),
-		Value:   body,
-		Headers: hdrs,
-	})
+	res := producer.ProduceSync(produceCtx, rec)
 	if err := res.FirstErr(); err != nil {
 		t.Fatalf("produce ledger posted message: %v", err)
 	}

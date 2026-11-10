@@ -7,41 +7,77 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/ledger-platform/projection-service/internal/config"
 	"github.com/ledger-platform/projection-service/internal/consumer"
 )
 
-// TestConsumer_TransientFailure_IsRedeliveredAfterRestart is Task 08's Finding 2: a failed apply
-// leaves its offset uncommitted but the loop moves on to the next record, and a Kafka commit is a
-// per-partition high-water mark. If the next record on the same partition then succeeds and is
-// committed, the failed one is behind the committed offset and is never redelivered.
-//
-// The topic has one partition, so both events share it. The first event's wallet row is blocked
-// behind an uncommitted owner INSERT with a short lock_timeout on the consumer's role, so that
-// apply fails transiently; the second event is unaffected.
-//
-// Reproduced (Task 08, Step 0): the blocked wallet has no row after the restart. The test asserts
-// the CORRECT behaviour and is skipped until the consumer loop stops committing past a failed
-// record. Until then Task 08's gap detection makes the loss visible and a rebuild repairs it.
-func TestConsumer_TransientFailure_IsRedeliveredAfterRestart(t *testing.T) {
-	t.Skip("known defect: see Task 08 Finding 2 -- a failed apply is committed past by the next record on the partition")
+// Task 08 Finding 2: a failed apply used to leave its offset uncommitted while the loop moved on,
+// and a Kafka commit is a per-partition high-water mark -- so the next successful record on the
+// partition committed past the failed one, which was never redelivered. These tests fail on
+// that behaviour: the blocked wallet ended with no row, even after a consumer restart.
 
-	ownerDSN, appDSN := setupProjectionDB(t)
-	bootstrap := setupKafka(t)
-	ctx := context.Background()
-
-	// Set on the role (new sessions pick it up) so the blocked apply fails fast with a lock timeout
-	// instead of consuming the whole tick's context deadline.
-	setup, err := pgx.Connect(ctx, ownerDSN)
+// blockWallet makes applies to wallet fail transiently: an uncommitted owner INSERT of its row
+// makes the consumer's upsert wait, and a short lock_timeout on projection_app turns the wait
+// into an error. Rolling back the returned transaction clears the fault.
+func blockWallet(t *testing.T, ctx context.Context, ownerDSN string, wallet uuid.UUID) pgx.Tx {
+	t.Helper()
+	conn, err := pgx.Connect(ctx, ownerDSN)
 	if err != nil {
 		t.Fatalf("connect as owner: %v", err)
 	}
-	if _, err := setup.Exec(ctx, `ALTER ROLE projection_app SET lock_timeout = '300ms'`); err != nil {
+	t.Cleanup(func() { _ = conn.Close(ctx) })
+	if _, err := conn.Exec(ctx, `ALTER ROLE projection_app SET lock_timeout = '300ms'`); err != nil {
 		t.Fatalf("set lock_timeout: %v", err)
 	}
-	_ = setup.Close(ctx)
-	pool := connectPool(t, appDSN)
+	holder, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin holder: %v", err)
+	}
+	if _, err := holder.Exec(ctx, `INSERT INTO projection_db.wallet_balances (wallet_id, balance) VALUES ($1, 0)`, wallet); err != nil {
+		t.Fatalf("hold wallet row: %v", err)
+	}
+	return holder
+}
+
+// tickN ticks with a generous context: a fresh consumer spends the start of its first Tick
+// joining the group, which must not eat into the apply under test.
+func tickN(c *consumer.LedgerPostedConsumer, n int) {
+	for i := 0; i < n; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		_ = c.Tick(ctx)
+		cancel()
+	}
+}
+
+func committedOffset(t *testing.T, ctx context.Context, bootstrap, group string, partition int32) int64 {
+	t.Helper()
+	cl, err := kgo.NewClient(kgo.SeedBrokers(bootstrap))
+	if err != nil {
+		t.Fatalf("admin client: %v", err)
+	}
+	defer cl.Close()
+	offsets, err := kadm.NewClient(cl).FetchOffsets(ctx, group)
+	if err != nil {
+		t.Fatalf("fetch offsets: %v", err)
+	}
+	o, ok := offsets.Lookup("ledger.posted.v1", partition)
+	if !ok {
+		return -1
+	}
+	return o.At
+}
+
+// TestConsumer_FailedApply_StopsThePartitionAndRetries: two events on one partition, the first
+// failing transiently. The partition must stop at the first (the second, healthy one waits behind
+// it, nothing is committed past it), resume on its own once the fault clears -- no restart -- and a
+// later restart must not apply anything twice.
+func TestConsumer_FailedApply_StopsThePartitionAndRetries(t *testing.T) {
+	ownerDSN, appDSN := setupProjectionDB(t)
+	bootstrap := setupKafka(t) // one partition, so both events share it
+	ctx := context.Background()
 
 	blocked, healthy := uuid.New(), uuid.New()
 	produceLedgerPosted(t, bootstrap, uuid.New(), time.Now().UTC(), []entryFixture{
@@ -50,58 +86,104 @@ func TestConsumer_TransientFailure_IsRedeliveredAfterRestart(t *testing.T) {
 	produceLedgerPosted(t, bootstrap, uuid.New(), time.Now().UTC(), []entryFixture{
 		{EntryID: uuid.New(), AccountID: healthy, EntryType: "CREDIT", Amount: "20.00"},
 	}, "")
+	holder := blockWallet(t, ctx, ownerDSN, blocked)
+	pool := connectPool(t, appDSN)
 
-	// An uncommitted owner INSERT of the blocked wallet's row: the consumer's upsert of the
-	// same key waits on it until lock_timeout.
-	owner, err := pgx.Connect(ctx, ownerDSN)
-	if err != nil {
-		t.Fatalf("connect as owner: %v", err)
-	}
-	defer func() { _ = owner.Close(ctx) }()
-	holder, err := owner.Begin(ctx)
-	if err != nil {
-		t.Fatalf("begin holder: %v", err)
-	}
-	if _, err := holder.Exec(ctx, `INSERT INTO projection_db.wallet_balances (wallet_id, balance) VALUES ($1, 0)`, blocked); err != nil {
-		t.Fatalf("hold blocked wallet row: %v", err)
-	}
-
-	cfg := &config.Config{KafkaBrokers: []string{bootstrap}, KafkaGroupID: "offset-test-group"}
-	first := consumer.NewLedgerPostedConsumer(pool, cfg)
-	if err := first.Connect(); err != nil {
+	cfg := &config.Config{KafkaBrokers: []string{bootstrap}, KafkaGroupID: "offset-test-group", PendingEntryAlertAfter: time.Minute}
+	c := consumer.NewLedgerPostedConsumer(pool, cfg)
+	if err := c.Connect(); err != nil {
 		t.Fatalf("Connect() = %v", err)
 	}
-	// A fresh consumer spends the start of its first Tick joining the group; the generous
-	// context keeps that from eating into the apply, so the lock timeout is the only fault.
-	tick := func(c *consumer.LedgerPostedConsumer) {
-		tickCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		defer cancel()
-		_ = c.Tick(tickCtx)
-	}
-	for i := 0; i < 5 && walletBalance(t, pool, healthy) != "20.00"; i++ {
-		tick(first)
-	}
-	if got := walletBalance(t, pool, healthy); got != "20.00" {
-		t.Fatalf("healthy wallet balance = %s, want 20.00 (the second event must apply)", got)
-	}
-	first.Close()
+	tickN(c, 3) // each tick retries the first event and fails on the lock
 
-	// The transient fault clears.
+	if got := walletBalance(t, pool, healthy); got != "<no row>" {
+		t.Errorf("healthy wallet = %s while the event before it is failing, want <no row>: the partition moved past a failed record", got)
+	}
+	if got := committedOffset(t, ctx, bootstrap, "offset-test-group", 0); got > 0 {
+		t.Errorf("committed offset = %d, want nothing committed past the failed record at offset 0", got)
+	}
+
+	// The fault clears: the same consumer, without a restart, delivers the failed event again.
 	if err := holder.Rollback(ctx); err != nil {
 		t.Fatalf("release holder: %v", err)
 	}
+	for i := 0; i < 5 && walletBalance(t, pool, healthy) != "20.00"; i++ {
+		tickN(c, 1)
+	}
+	if got := walletBalance(t, pool, blocked); got != "10.00" {
+		t.Errorf("blocked wallet = %s after the fault cleared, want 10.00", got)
+	}
+	if got := walletBalance(t, pool, healthy); got != "20.00" {
+		t.Errorf("healthy wallet = %s after the fault cleared, want 20.00", got)
+	}
+	c.Close()
 
-	// A restarted consumer in the same group resumes from the committed offset.
-	second := consumer.NewLedgerPostedConsumer(pool, cfg)
-	if err := second.Connect(); err != nil {
+	// A restart resumes from the committed offset: nothing is redelivered and nothing doubles.
+	restarted := consumer.NewLedgerPostedConsumer(pool, cfg)
+	if err := restarted.Connect(); err != nil {
 		t.Fatalf("Connect() (restart) = %v", err)
 	}
-	t.Cleanup(second.Close)
-	for i := 0; i < 3 && walletBalance(t, pool, blocked) != "10.00"; i++ {
-		tick(second)
+	t.Cleanup(restarted.Close)
+	tickN(restarted, 2)
+	if b, h := walletBalance(t, pool, blocked), walletBalance(t, pool, healthy); b != "10.00" || h != "20.00" {
+		t.Errorf("after restart: blocked=%s healthy=%s, want 10.00 / 20.00", b, h)
+	}
+}
+
+// TestConsumer_FailedApply_OtherPartitionsKeepFlowing: stopping a partition must not stop the
+// consumer. Partition 0 holds a failing event and a healthy one behind it; partition 1 holds a
+// healthy event. Partition 1 applies while partition 0 waits; everything applies once the fault
+// clears.
+func TestConsumer_FailedApply_OtherPartitionsKeepFlowing(t *testing.T) {
+	ownerDSN, appDSN := setupProjectionDB(t)
+	bootstrap := setupKafka(t)
+	ctx := context.Background()
+
+	adminCl, err := kgo.NewClient(kgo.SeedBrokers(bootstrap))
+	if err != nil {
+		t.Fatalf("admin client: %v", err)
+	}
+	if _, err := kadm.NewClient(adminCl).UpdatePartitions(ctx, 2, "ledger.posted.v1"); err != nil {
+		t.Fatalf("add a partition: %v", err)
+	}
+	adminCl.Close()
+
+	blocked, behind, other := uuid.New(), uuid.New(), uuid.New()
+	credit := func(w uuid.UUID, amount string) []entryFixture {
+		return []entryFixture{{EntryID: uuid.New(), AccountID: w, EntryType: "CREDIT", Amount: amount}}
+	}
+	produceLedgerPostedToPartition(t, bootstrap, 0, credit(blocked, "10.00"))
+	produceLedgerPostedToPartition(t, bootstrap, 0, credit(behind, "20.00"))
+	produceLedgerPostedToPartition(t, bootstrap, 1, credit(other, "30.00"))
+	holder := blockWallet(t, ctx, ownerDSN, blocked)
+	pool := connectPool(t, appDSN)
+
+	c := consumer.NewLedgerPostedConsumer(pool, &config.Config{
+		KafkaBrokers: []string{bootstrap}, KafkaGroupID: "two-partition-group", PendingEntryAlertAfter: time.Minute,
+	})
+	if err := c.Connect(); err != nil {
+		t.Fatalf("Connect() = %v", err)
+	}
+	t.Cleanup(c.Close)
+
+	for i := 0; i < 5 && walletBalance(t, pool, other) != "30.00"; i++ {
+		tickN(c, 1)
+	}
+	if got := walletBalance(t, pool, other); got != "30.00" {
+		t.Fatalf("partition 1's wallet = %s, want 30.00: a failure on partition 0 must not stop partition 1", got)
+	}
+	tickN(c, 1)
+	if got := walletBalance(t, pool, behind); got != "<no row>" {
+		t.Errorf("wallet behind the failure on partition 0 = %s, want <no row>", got)
 	}
 
-	if got := walletBalance(t, pool, blocked); got != "10.00" {
-		t.Errorf("blocked wallet balance after restart = %s, want 10.00: the failed event was committed past and never redelivered", got)
+	if err := holder.Rollback(ctx); err != nil {
+		t.Fatalf("release holder: %v", err)
+	}
+	for i := 0; i < 5 && walletBalance(t, pool, behind) != "20.00"; i++ {
+		tickN(c, 1)
+	}
+	if b, h := walletBalance(t, pool, blocked), walletBalance(t, pool, behind); b != "10.00" || h != "20.00" {
+		t.Errorf("after the fault cleared: blocked=%s behind=%s, want 10.00 / 20.00", b, h)
 	}
 }

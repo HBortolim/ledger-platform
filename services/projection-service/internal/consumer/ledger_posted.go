@@ -21,6 +21,10 @@ import (
 
 const ledgerPostedTopic = "ledger.posted.v1"
 
+// applyRetryBackoff spaces out retries of a partition stopped on a failed apply, so a database
+// outage is not a hot loop of failing applies and error logs.
+const applyRetryBackoff = time.Second
+
 var tracer = otel.Tracer("github.com/ledger-platform/projection-service/internal/consumer")
 
 // recordCarrier adapts a consumed record's headers to OTel's TextMapCarrier.
@@ -49,7 +53,11 @@ func (c recordCarrier) Keys() []string {
 // LedgerPostedConsumer drains ledger.posted.v1 into projection_db.wallet_balances.
 // Kafka offsets are committed only after the corresponding DB transaction
 // commits (NFR-AVAIL-3): a crash between the two simply redelivers the
-// record, and applyEntry's idempotency check makes the re-apply a no-op.
+// record, and the per-wallet sequence makes the re-apply a no-op.
+//
+// A failed apply stops its partition at that record (SPEC.md §9.9): a Kafka commit is a
+// per-partition high-water mark, so committing any later record would commit past the failed
+// one and it would never be redelivered.
 type LedgerPostedConsumer struct {
 	pool         *pgxpool.Pool
 	kafkaBrokers []string
@@ -79,6 +87,9 @@ func (c *LedgerPostedConsumer) Connect() error {
 		kgo.ConsumeTopics(ledgerPostedTopic),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 		kgo.DisableAutoCommit(),
+		// Rebalances wait for AllowRebalance, so a partition cannot be revoked between the poll
+		// and the SetOffsets rewind in Tick (franz-go's guidance for SetOffsets in a group).
+		kgo.BlockRebalanceOnPoll(),
 	)
 	if err != nil {
 		return err
@@ -124,9 +135,17 @@ func (c *LedgerPostedConsumer) Run(ctx context.Context) {
 // apply and commit each record in order. Exported so integration tests can
 // drive the consumer deterministically instead of racing an async Run loop
 // (mirrors outbox.Worker.Poll in the ledger-service).
+//
+// Records are processed partition by partition. When an apply fails, that partition stops at
+// the failed record: its remaining records in this batch are not processed, and the client is
+// rewound to the failed record so the next poll delivers it again. Other partitions carry on.
 func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 	fetches := c.client.PollFetches(ctx)
-	if fetches.IsClientClosed() || ctx.Err() != nil {
+	if fetches.IsClientClosed() {
+		return nil
+	}
+	if ctx.Err() != nil {
+		c.client.AllowRebalance()
 		return nil
 	}
 
@@ -135,18 +154,52 @@ func (c *LedgerPostedConsumer) Tick(ctx context.Context) error {
 			slog.String("topic", topic), slog.Int("partition", int(partition)), slog.Any("error", err))
 	})
 
-	fetches.EachRecord(func(r *kgo.Record) {
-		c.applyRecord(ctx, r)
+	rewind := map[string]map[int32]kgo.EpochOffset{}
+	fetches.EachPartition(func(p kgo.FetchTopicPartition) {
+		if _, stopped := rewind[p.Topic][p.Partition]; stopped {
+			return // a partition can appear in more than one fetch of a poll
+		}
+		for _, r := range p.Records {
+			if c.applyRecord(ctx, r) {
+				continue
+			}
+			if rewind[p.Topic] == nil {
+				rewind[p.Topic] = map[int32]kgo.EpochOffset{}
+			}
+			rewind[p.Topic][p.Partition] = kgo.EpochOffset{Epoch: r.LeaderEpoch, Offset: r.Offset}
+			return
+		}
 	})
+
+	if len(rewind) == 0 {
+		c.client.AllowRebalance()
+		return nil
+	}
+
+	// The poll already advanced the client past these records; move the stopped partitions
+	// back to their failed record. Buffered data is discarded without moving any other
+	// partition's position.
+	c.client.SetOffsets(rewind)
+	c.client.AllowRebalance()
+	for topic, partitions := range rewind {
+		for partition, at := range partitions {
+			slog.WarnContext(ctx, "projection consumer: partition stopped on a failed apply, will retry",
+				slog.String("topic", topic), slog.Int("partition", int(partition)), slog.Int64("offset", at.Offset))
+		}
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(applyRetryBackoff):
+	}
 	return nil
 }
 
-// applyRecord decodes and applies one Kafka record. A decode failure is
-// treated as a poison message: logged, counted, and committed past — a
-// stuck partition is worse than a counted skip. Any other failure (e.g. the
-// database being down) leaves the offset uncommitted so the record is
-// redelivered on the next tick (§9.9).
-func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
+// applyRecord decodes and applies one Kafka record and reports whether the partition may move
+// on past it. A decode failure is treated as a poison message: logged, counted, and committed
+// past — it can never succeed, and a stuck partition is worse than a counted skip. Any other
+// failure (e.g. the database being down) returns false: the offset stays uncommitted and Tick
+// stops the partition at this record so it is retried (§9.9).
+func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) bool {
 	ctx = otel.GetTextMapPropagator().Extract(ctx, recordCarrier(r.Headers))
 	ctx, span := tracer.Start(ctx, "projection apply",
 		trace.WithSpanKind(trace.SpanKindConsumer),
@@ -170,7 +223,7 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 		if err := c.client.CommitRecords(ctx, r); err != nil {
 			slog.ErrorContext(ctx, "projection consumer: commit past poison message failed", slog.Any("error", err))
 		}
-		return
+		return true
 	}
 
 	res, err := applyEvent(ctx, c.pool, event, c.groupID, r.Topic, r.Partition, r.Offset)
@@ -180,7 +233,7 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 			slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "apply failed")
-		return
+		return false
 	}
 	slog.InfoContext(ctx, "projection consumer: apply succeeded",
 		slog.String("transaction_id", event.TransactionID.String()),
@@ -199,14 +252,17 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) {
 	// TODO(M6+): publish BALANCE_UPDATED here once a consumer needs it
 	// (notification-service is optional and unbuilt per SPEC.md §5.2).
 
+	// The apply is committed in Postgres, so the partition may move on even if this offset commit
+	// fails: a later record's commit covers it, and a redelivery is skipped by its seq.
 	if err := c.client.CommitRecords(ctx, r); err != nil {
 		slog.ErrorContext(ctx, "projection consumer: commit offset failed",
 			slog.String("transaction_id", event.TransactionID.String()),
 			slog.Any("error", err))
-		return
+		return true
 	}
 
 	c.reportConsumerLag(ctx, r.Topic, r.Partition)
+	return true
 }
 
 // reportConsumerLag is best-effort observability: a failed lookup must never
