@@ -181,3 +181,12 @@ git commit -m "test: add TST-CONCURRENCY-3, disjoint wallet pairs don't block ea
 - ✓ TST-CONCURRENCY-3 assertion: `sharedElapsed > 2 * disjointElapsed`
 - ✓ Repeatability: 5 consecutive runs, all pass without threshold adjustment
 - ✓ Warm-up justified by initial run behavior (database cold-start masking serialization)
+
+## Revision (Milestone 6): the timing ratio was replaced
+
+The T'/T > 2x assertion was flaky (about 1 run in 4, also on a tree without Task 06). A batch's time is the
+slowest of 50 transfers on a ~25ms baseline, and one pooled connection intermittently stalled ~200ms for the
+whole run, so even best-of-5 rounds still failed. The test is now deterministic: it holds A's
+`account_balances_locked` row in an open transaction, proves A->B is blocked (`pg_stat_activity`), and asserts
+C->D still completes; A->B completes after release. Mutation-checked: a ledger-wide advisory lock in `Post`
+fails it. 15/15 passes.
