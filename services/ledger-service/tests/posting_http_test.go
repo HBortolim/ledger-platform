@@ -42,7 +42,7 @@ func TestPostingHTTP(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler.RegisterRoutes(router, pool, h)
+	handler.RegisterRoutes(router, pool, h, handler.NewReconciliationHandler(nil))
 
 	postJSON := func(t *testing.T, body any) *httptest.ResponseRecorder {
 		t.Helper()

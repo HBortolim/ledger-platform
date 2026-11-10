@@ -114,7 +114,7 @@ func (h *PostingHandler) PostPosting(c *gin.Context) {
 }
 
 func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
-	var dupErr          domain.ErrDuplicateTransaction
+	var dupErr domain.ErrDuplicateTransaction
 	var insufficientErr domain.ErrInsufficientFunds
 	var dailyCapErr domain.ErrDailyCapExceeded
 	var unbalancedErr domain.ErrUnbalanced
@@ -124,7 +124,7 @@ func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
 	case errors.As(err, &dupErr):
 		original, fetchErr := h.svc.GetTransaction(c.Request.Context(), dupErr.ID)
 		if fetchErr != nil {
-			h.renderDBUnavailable(c)
+			renderDBUnavailable(c)
 			return
 		}
 		c.JSON(http.StatusConflict, renderPosting(original))
@@ -137,11 +137,11 @@ func (h *PostingHandler) renderPostError(c *gin.Context, err error) {
 	case errors.As(err, &dailyCapErr):
 		c.JSON(http.StatusUnprocessableEntity, errorResponse{Code: "DAILY_LIMIT_EXCEEDED", Message: dailyCapErr.Error()})
 	default:
-		h.renderDBUnavailable(c)
+		renderDBUnavailable(c)
 	}
 }
 
-func (h *PostingHandler) renderDBUnavailable(c *gin.Context) {
+func renderDBUnavailable(c *gin.Context) {
 	c.Header("Retry-After", "1")
 	c.JSON(http.StatusServiceUnavailable, errorResponse{Code: "DB_UNAVAILABLE"})
 }
@@ -159,7 +159,7 @@ func (h *PostingHandler) GetTransaction(c *gin.Context) {
 			c.JSON(http.StatusNotFound, errorResponse{Code: "NOT_FOUND"})
 			return
 		}
-		h.renderDBUnavailable(c)
+		renderDBUnavailable(c)
 		return
 	}
 	c.JSON(http.StatusOK, renderPosting(tx))

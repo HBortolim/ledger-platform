@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHandler) {
+func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHandler, reconciliationHandler *ReconciliationHandler) {
 	hc := r.Group("/health")
 	{
 		hc.GET("/live", live)
@@ -26,5 +26,6 @@ func RegisterRoutes(r *gin.Engine, pool *pgxpool.Pool, postingHandler *PostingHa
 	admin := traced.Group("/admin")
 	{
 		admin.GET("/ledger/transactions/:id", postingHandler.GetTransaction)
+		admin.POST("/reconciliation/run", reconciliationHandler.Run)
 	}
 }

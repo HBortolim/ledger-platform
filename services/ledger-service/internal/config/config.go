@@ -3,7 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -15,6 +17,9 @@ type Config struct {
 	AppPort          string
 	DailyTransferCap decimal.Decimal
 	SystemAccountID  uuid.UUID
+
+	ReconciliationEnabled  bool
+	ReconciliationInterval time.Duration
 }
 
 func Load() (*Config, error) {
@@ -51,11 +56,35 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid SYSTEM_ACCOUNT_ID %q: %w", systemAccountIDStr, err)
 	}
 
+	reconEnabledStr := os.Getenv("RECONCILIATION_ENABLED")
+	if reconEnabledStr == "" {
+		reconEnabledStr = "true"
+	}
+	reconEnabled, err := strconv.ParseBool(reconEnabledStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RECONCILIATION_ENABLED %q: %w", reconEnabledStr, err)
+	}
+
+	reconIntervalStr := os.Getenv("RECONCILIATION_INTERVAL")
+	if reconIntervalStr == "" {
+		reconIntervalStr = "1h"
+	}
+	reconInterval, err := time.ParseDuration(reconIntervalStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RECONCILIATION_INTERVAL %q: %w", reconIntervalStr, err)
+	}
+	if reconInterval <= 0 {
+		return nil, fmt.Errorf("invalid RECONCILIATION_INTERVAL %q: must be positive", reconIntervalStr)
+	}
+
 	return &Config{
 		DatabaseURL:      dbURL,
 		KafkaBrokers:     strings.Split(brokers, ","),
 		AppPort:          ":" + port,
 		DailyTransferCap: dailyCap,
 		SystemAccountID:  systemAccountID,
+
+		ReconciliationEnabled:  reconEnabled,
+		ReconciliationInterval: reconInterval,
 	}, nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/ledger-platform/ledger-service/internal/logging"
 	"github.com/ledger-platform/ledger-service/internal/observability"
 	"github.com/ledger-platform/ledger-service/internal/outbox"
+	"github.com/ledger-platform/ledger-service/internal/reconciliation"
 	"github.com/ledger-platform/ledger-service/internal/repository"
 	"github.com/ledger-platform/ledger-service/internal/service"
 )
@@ -78,10 +79,18 @@ func main() {
 	postingSvc := service.NewPostingService(postingRepo)
 	postingHandler := handler.NewPostingHandler(postingSvc)
 
+	reconRepo := repository.NewReconciliationRepository(pool)
+	reconSvc := service.NewReconciliationService(reconRepo, service.ReconciliationOptions{
+		InvariantWindow: 2 * cfg.ReconciliationInterval, // slack, so a slow tick never leaves a gap
+		DriftGrace:      10 * time.Second,               // 2 x NFR-CONS-2's p99 lag of 5s
+		PassTimeout:     2 * time.Minute,
+	})
+	reconHandler := handler.NewReconciliationHandler(reconSvc)
+
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	handler.RegisterRoutes(router, pool, postingHandler)
+	handler.RegisterRoutes(router, pool, postingHandler, reconHandler)
 
 	srv := &http.Server{
 		Addr:    cfg.AppPort,
@@ -94,6 +103,10 @@ func main() {
 	g.Go(func() error {
 		return worker.Run(gctx)
 	})
+	if cfg.ReconciliationEnabled {
+		scheduler := reconciliation.NewScheduler(reconSvc, cfg.ReconciliationInterval)
+		g.Go(func() error { return scheduler.Run(gctx) })
+	}
 	g.Go(func() error {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			return err

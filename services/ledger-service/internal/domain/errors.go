@@ -59,3 +59,9 @@ type ErrInvalidAmount struct {
 func (e ErrInvalidAmount) Error() string {
 	return fmt.Sprintf("invalid amount: %s", e.Reason)
 }
+
+// ErrReconciliationInProgress is returned when a pass is requested while another is still
+// running. It is a refusal, not a failure of the job.
+type ErrReconciliationInProgress struct{}
+
+func (ErrReconciliationInProgress) Error() string { return "a reconciliation pass is already running" }

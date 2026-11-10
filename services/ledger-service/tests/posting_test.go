@@ -209,8 +209,8 @@ func TestPostingRepository(t *testing.T) {
 
 	t.Run("SystemAccountOverdraft/DepositEntersMoneyThroughAPI", func(t *testing.T) {
 		wallet := uuid.New()
-		// System account is seeded at 1000.00 by migration 0002; debit well past
-		// that to prove the exemption, not just headroom within the seed value.
+		// The system account starts at 0.00 (migration 0005 zeroes the 0002 seed), so any debit
+		// proves the exemption from the overdraft check.
 		deposit := newBalancedTransfer(systemFundingAccountID, wallet, "1500.00")
 		if err := repo.Post(ctx, deposit); err != nil {
 			t.Fatalf("deposit Post() = error %v, want nil (system account must be exempt from the overdraft check)", err)
@@ -220,8 +220,8 @@ func TestPostingRepository(t *testing.T) {
 		if err := pool.QueryRow(ctx, "SELECT balance::text FROM ledger_db.account_balances_locked WHERE account_id = $1", systemFundingAccountID).Scan(&systemBalance); err != nil {
 			t.Fatalf("query system account balance: %v", err)
 		}
-		if systemBalance != "-500.00" {
-			t.Errorf("system account balance = %s, want -500.00 (1000.00 seed - 1500.00 debit, negative per NFR-CONS-5)", systemBalance)
+		if systemBalance != "-1500.00" {
+			t.Errorf("system account balance = %s, want -1500.00 (0.00 seed - 1500.00 debit, negative per NFR-CONS-5)", systemBalance)
 		}
 
 		var walletBalance string
