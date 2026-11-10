@@ -824,7 +824,7 @@ Recovery: `last_entry_id` check in the projection update. Second delivery is det
 
 Wallet Service: returns 503. No partial state.
 Ledger Service: returns 503. Any in-flight transaction is rolled back by Postgres on reconnect.
-Projection Service: consumer pauses, doesn't commit offsets. When DB returns, resumes.
+Projection Service: the consumer stops the affected partition at the failed event, doesn't commit past it, and retries it (with a short backoff) until the DB returns; then it resumes from that event. Other partitions keep flowing. A Kafka commit is a per-partition high-water mark, so moving on to a later event would commit past the failed one and lose it.
 
 ### 9.10 Clock skew between services
 
@@ -832,7 +832,7 @@ A risk for any logic that compares timestamps across services. Mitigation: all t
 
 ### 9.11 Out-of-order events on a partition
 
-Should not happen given key-based partitioning, but if it does (e.g., a producer retry after a partition rebalance): the projection's `last_entry_id` check protects against applying an older entry on top of a newer one — but we'd need a strict ordering field. For v1, accept the risk and document it.
+Expected, not exceptional: `LEDGER_POSTED` is keyed by transaction ID, so one wallet's events are spread across partitions and arrive in any order (§7.3). The strict ordering field is the per-wallet `seq`: the projection applies an entry only when it is the next number, parks entries that arrive ahead of a gap and applies them once the gap fills, and reports a gap that never fills (ADR-0017).
 
 ---
 
@@ -888,7 +888,7 @@ These are the highest-value tests in the whole suite. A reviewer who sees these 
 |---|---|
 | TST-CONCURRENCY-1 | **Money cannot be created.** 100 concurrent transfers from a wallet with insufficient cumulative funds. Some succeed, some fail with INSUFFICIENT_FUNDS, sum of successes ≤ initial balance. Run 50 iterations. |
 | TST-CONCURRENCY-2 | **Money cannot be destroyed.** 100 concurrent transfers between two wallets. Sum of (source_initial - source_final) MUST equal sum of (dest_final - dest_initial). |
-| TST-CONCURRENCY-3 | **Disjoint pairs don't block.** 50 concurrent transfers across 50 distinct wallet pairs complete in time T. Then 50 concurrent transfers from the same source complete in time T' >> T. Asserts no global serialization. |
+| TST-CONCURRENCY-3 | **Disjoint pairs don't block.** While one transaction holds wallet A's account lock, a transfer touching A blocks and a transfer between two unrelated wallets still completes; A's transfer completes once the lock is released. Asserts no global serialization. Deterministic by design: an earlier timing comparison (50 disjoint vs 50 same-source transfers, T' >> T) was flaky because one slow connection decided a ~25 ms batch. |
 | TST-CONCURRENCY-4 | **Idempotency under concurrency.** Same idempotency key submitted 20 times in parallel. Exactly one ledger transaction created. All 20 responses identical. |
 
 ### 10.5 Chaos tests (stretch goal)
