@@ -45,7 +45,7 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 	}
 
 	// Step 2: Acquire FOR UPDATE on every account referenced — DEBIT *and* CREDIT — sorted
-	lockedBalances, err := lockAccounts(ctx, dbtx, sortedAccountIDs(tx.Entries))
+	lockedBalances, lockedSeqs, err := lockAccounts(ctx, dbtx, sortedAccountIDs(tx.Entries))
 	if err != nil {
 		return err
 	}
@@ -60,6 +60,11 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 	if err := checkDailyTransferCap(ctx, dbtx, tx.Entries, r.dailyCap, r.systemAccountID); err != nil {
 		return err
 	}
+
+	// Step 3.9: Number each entry within its account's history (SEQ-2/SEQ-3). Safe only because
+	// the row locks from step 2 are still held: the counter read there cannot move before our
+	// commit. Works on a copy so the caller's entries are not mutated.
+	tx.Entries = assignEntrySeqs(tx.Entries, lockedSeqs)
 
 	// Step 4: Insert the transaction header.
 	if err := insertLedgerTransaction(ctx, dbtx, tx); err != nil {
@@ -118,7 +123,7 @@ func (r *PostingRepository) GetTransactionByID(ctx context.Context, id uuid.UUID
 	}
 
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, account_id, entry_type, amount::text, created_at
+		`SELECT id, account_id, entry_type, amount::text, seq, created_at
 		   FROM ledger_db.ledger_entries
 		  WHERE transaction_id = $1
 		  ORDER BY id`,
@@ -135,9 +140,10 @@ func (r *PostingRepository) GetTransactionByID(ctx context.Context, id uuid.UUID
 			accountID uuid.UUID
 			entryType string
 			amountStr string
+			seq       int64
 			entCreAt  time.Time
 		)
-		if err := rows.Scan(&entryID, &accountID, &entryType, &amountStr, &entCreAt); err != nil {
+		if err := rows.Scan(&entryID, &accountID, &entryType, &amountStr, &seq, &entCreAt); err != nil {
 			return domain.LedgerTransaction{}, fmt.Errorf("scan entry row: %w", err)
 		}
 		money, err := domain.NewMoney(amountStr)
@@ -150,6 +156,7 @@ func (r *PostingRepository) GetTransactionByID(ctx context.Context, id uuid.UUID
 			AccountID:     accountID,
 			EntryType:     domain.EntryType(entryType),
 			Amount:        money,
+			Seq:           seq,
 			CreatedAt:     entCreAt,
 		})
 	}
@@ -204,29 +211,52 @@ func upsertAccountLocks(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) error {
 	return br.Close()
 }
 
-// lockAccounts issues SELECT … FOR UPDATE on each given account in sorted order.
+// lockAccounts issues SELECT … FOR UPDATE on each given account in sorted order and returns each
+// account's cached balance and its entry counter (the last seq handed out).
 // Sorting prevents deadlocks when concurrent transactions target overlapping account sets.
-func lockAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]decimal.Decimal, error) {
-	balances := make(map[uuid.UUID]decimal.Decimal, len(ids))
+func lockAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (balances map[uuid.UUID]decimal.Decimal, entrySeqs map[uuid.UUID]int64, err error) {
+	balances = make(map[uuid.UUID]decimal.Decimal, len(ids))
+	entrySeqs = make(map[uuid.UUID]int64, len(ids))
 	for _, id := range ids {
-		var balStr string
+		var (
+			balStr string
+			seq    int64
+		)
 		err := tx.QueryRow(ctx,
-			`SELECT balance::text
+			`SELECT balance::text, entry_seq
 			   FROM ledger_db.account_balances_locked
 			  WHERE account_id = $1
 			    FOR UPDATE`, // balance cast to text to avoid pgx decimal parsing issues
 			id,
-		).Scan(&balStr)
+		).Scan(&balStr, &seq)
 		if err != nil {
-			return nil, fmt.Errorf("lock account %s: %w", id, err)
+			return nil, nil, fmt.Errorf("lock account %s: %w", id, err)
 		}
 		d, err := decimal.NewFromString(balStr)
 		if err != nil {
-			return nil, fmt.Errorf("parse locked balance for %s: %w", id, err)
+			return nil, nil, fmt.Errorf("parse locked balance for %s: %w", id, err)
 		}
 		balances[id] = d
+		entrySeqs[id] = seq
 	}
-	return balances, nil
+	return balances, entrySeqs, nil
+}
+
+// assignEntrySeqs returns a copy of entries with Seq set: for each account, the entries get
+// consecutive numbers continuing from that account's counter, in the order they appear in the
+// posting (SEQ-3). lockedSeqs must have been read under the account's row lock (SEQ-2).
+func assignEntrySeqs(entries []domain.LedgerEntry, lockedSeqs map[uuid.UUID]int64) []domain.LedgerEntry {
+	next := make(map[uuid.UUID]int64, len(lockedSeqs))
+	for id, seq := range lockedSeqs {
+		next[id] = seq
+	}
+	out := make([]domain.LedgerEntry, len(entries))
+	for i, e := range entries {
+		next[e.AccountID]++
+		e.Seq = next[e.AccountID]
+		out[i] = e
+	}
+	return out
 }
 
 // checkAvailableBalance rejects any debit that would overdraw its account,
@@ -313,9 +343,9 @@ func insertLedgerEntries(ctx context.Context, tx pgx.Tx, entries []domain.Ledger
 	batch := &pgx.Batch{}
 	for _, e := range entries {
 		batch.Queue(
-			`INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount)
-			 VALUES ($1, $2, $3, $4, $5::numeric)`,
-			e.ID, e.TransactionID, e.AccountID, string(e.EntryType), e.Amount.String(),
+			`INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount, seq)
+			 VALUES ($1, $2, $3, $4, $5::numeric, $6)`,
+			e.ID, e.TransactionID, e.AccountID, string(e.EntryType), e.Amount.String(), e.Seq,
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
@@ -330,7 +360,9 @@ func insertLedgerEntries(ctx context.Context, tx pgx.Tx, entries []domain.Ledger
 
 func applyBalanceDeltas(ctx context.Context, tx pgx.Tx, entries []domain.LedgerEntry) error {
 	deltas := make(map[uuid.UUID]decimal.Decimal, len(entries))
+	lastSeq := make(map[uuid.UUID]int64, len(entries)) // entries carry their seq by now; the highest is the new counter
 	for _, e := range entries {
+		lastSeq[e.AccountID] = max(lastSeq[e.AccountID], e.Seq)
 		if e.EntryType == domain.Credit {
 			deltas[e.AccountID] = deltas[e.AccountID].Add(e.Amount.Decimal())
 		} else {
@@ -341,9 +373,9 @@ func applyBalanceDeltas(ctx context.Context, tx pgx.Tx, entries []domain.LedgerE
 	for accountID, delta := range deltas {
 		batch.Queue(
 			`UPDATE ledger_db.account_balances_locked
-			    SET balance = balance + $1::numeric, updated_at = now()
+			    SET balance = balance + $1::numeric, entry_seq = $3, updated_at = now()
 			  WHERE account_id = $2`,
-			delta.StringFixed(2), accountID,
+			delta.StringFixed(2), accountID, lastSeq[accountID],
 		)
 	}
 	br := tx.SendBatch(ctx, batch)
@@ -371,6 +403,7 @@ type entryPayload struct {
 	AccountID uuid.UUID `json:"accountId"`
 	EntryType string    `json:"entryType"`
 	Amount    string    `json:"amount"`
+	Seq       int64     `json:"seq"` // schemaVersion 2: this entry's position in its account's history
 }
 
 func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction) error {
@@ -384,10 +417,11 @@ func insertOutboxRow(ctx context.Context, tx pgx.Tx, t domain.LedgerTransaction)
 			AccountID: e.AccountID,
 			EntryType: string(e.EntryType),
 			Amount:    e.Amount.String(),
+			Seq:       e.Seq,
 		}
 	}
 	payload := ledgerPostedPayload{
-		SchemaVersion:   1,
+		SchemaVersion:   2,
 		EventID:         uuid.New(),
 		EventType:       "LEDGER_POSTED",
 		OccurredAt:      time.Now().UTC(),

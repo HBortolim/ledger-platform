@@ -103,8 +103,10 @@ func (f *reconFixture) header(id uuid.UUID, ago string) {
 // (which fires on header inserts only) never sees it.
 func (f *reconFixture) entry(txID, account uuid.UUID, entryType, amount, ago string) {
 	f.t.Helper()
-	f.exec(`INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount, created_at)
-	        VALUES ($1, $2, $3, $4, $5::numeric, now() - $6::interval)`, uuid.New(), txID, account, entryType, amount, ago)
+	f.exec(`INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount, seq, created_at)
+	        VALUES ($1, $2, $3, $4, $5::numeric,
+	                (SELECT COALESCE(MAX(seq), 0) + 1 FROM ledger_db.ledger_entries WHERE account_id = $3),
+	                now() - $6::interval)`, uuid.New(), txID, account, entryType, amount, ago)
 }
 
 // balancedTransfer commits a balanced debit/credit pair created `ago` in the past.
@@ -112,9 +114,9 @@ func (f *reconFixture) balancedTransfer(debit, credit uuid.UUID, amount, ago str
 	f.t.Helper()
 	id := uuid.New()
 	f.exec(`WITH h AS (INSERT INTO ledger_db.ledger_transactions(id, type, created_at) VALUES ($1, 'TRANSFER', now() - $5::interval))
-	        INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount, created_at) VALUES
-	          (gen_random_uuid(), $1, $2, 'DEBIT',  $4::numeric, now() - $5::interval),
-	          (gen_random_uuid(), $1, $3, 'CREDIT', $4::numeric, now() - $5::interval)`, id, debit, credit, amount, ago)
+	        INSERT INTO ledger_db.ledger_entries(id, transaction_id, account_id, entry_type, amount, seq, created_at) VALUES
+	          (gen_random_uuid(), $1, $2, 'DEBIT',  $4::numeric, (SELECT COALESCE(MAX(seq), 0) + 1 FROM ledger_db.ledger_entries WHERE account_id = $2), now() - $5::interval),
+	          (gen_random_uuid(), $1, $3, 'CREDIT', $4::numeric, (SELECT COALESCE(MAX(seq), 0) + 1 FROM ledger_db.ledger_entries WHERE account_id = $3), now() - $5::interval)`, id, debit, credit, amount, ago)
 	return id
 }
 
@@ -442,7 +444,7 @@ func TestMigration0005_ZeroesSystemSeedOnlyWhenUntouched(t *testing.T) {
 		if err != nil {
 			t.Fatalf("migrate.New: %v", err)
 		}
-		if err := m.Migrate(4); err != nil { // roll 0005 back; untouched seed returns to 1000
+		if err := m.Migrate(4); err != nil { // roll 0006 and 0005 back (no seq column yet); untouched seed returns to 1000
 			t.Fatalf("Migrate(4) = %v", err)
 		}
 		if got := systemCachedBalance(t, ownerDSN); !got.Equal(dec("1000")) {

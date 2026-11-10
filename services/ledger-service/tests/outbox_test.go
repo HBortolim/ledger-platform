@@ -104,7 +104,7 @@ func TestOutboxWorker_PublishesToKafka(t *testing.T) {
 		})
 	}
 
-	if envelope.SchemaVersion != 1 || envelope.EventType != "LEDGER_POSTED" || envelope.TransactionID != tx.ID.String() {
+	if envelope.SchemaVersion != 2 || envelope.EventType != "LEDGER_POSTED" || envelope.TransactionID != tx.ID.String() {
 		t.Errorf("kafka message envelope mismatch: %+v", envelope)
 	}
 	if len(envelope.Entries) != 2 {

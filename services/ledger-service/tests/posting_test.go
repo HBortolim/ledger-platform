@@ -69,16 +69,22 @@ func TestPostingRepository(t *testing.T) {
 				AccountID string `json:"accountId"`
 				EntryType string `json:"entryType"`
 				Amount    string `json:"amount"`
+				Seq       int64  `json:"seq"`
 			} `json:"entries"`
 		}
 		if err := json.Unmarshal(payload, &envelope); err != nil {
 			t.Fatalf("could not unmarshal outbox payload: %v", err)
 		}
-		if envelope.SchemaVersion != 1 || envelope.EventType != "LEDGER_POSTED" || envelope.TransactionID != tx.ID.String() {
+		if envelope.SchemaVersion != 2 || envelope.EventType != "LEDGER_POSTED" || envelope.TransactionID != tx.ID.String() {
 			t.Errorf("outbox payload envelope mismatch: %+v", envelope)
 		}
 		if len(envelope.Entries) != 2 {
 			t.Errorf("outbox payload entries = %d, want 2", len(envelope.Entries))
+		}
+		for _, e := range envelope.Entries {
+			if e.Seq != 1 { // both accounts are fresh in this subtest, so each entry is its account's first
+				t.Errorf("outbox entry %s seq = %d, want 1", e.EntryID, e.Seq)
+			}
 		}
 
 		var debitBalance, creditBalance string
