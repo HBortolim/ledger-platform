@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -164,5 +165,46 @@ func TestMigration0004_GrantsLedgerReadOnly_AndRollsBack(t *testing.T) {
 	}
 	if _, err := app.Exec(ctx, `SELECT count(*) FROM ledger_db.ledger_entries`); err != nil {
 		t.Errorf("after re-applying 0004, projection_app SELECT = %v, want nil", err)
+	}
+}
+
+// TestMigration0005_GrantsLedgerAppReadOnly_AndRollsBack asserts the reconciliation job's grant:
+// ledger_app may read wallet_balances and nothing else. Drift is reported by the Ledger Service
+// and repaired by the rebuild (SPEC §5.2); the reporter must never be able to "fix" a row itself.
+func TestMigration0005_GrantsLedgerAppReadOnly_AndRollsBack(t *testing.T) {
+	ownerDSN, _ := setupProjectionDB(t) // already migrated, 0005 included
+	ledgerAppDSN := strings.Replace(ownerDSN, "ledger:ledger@", "ledger_app:ledger_app@", 1)
+	ledgerApp := connectPool(t, ledgerAppDSN)
+	ctx := context.Background()
+
+	if _, err := ledgerApp.Exec(ctx, `SELECT count(*) FROM projection_db.wallet_balances`); err != nil {
+		t.Fatalf("ledger_app SELECT on wallet_balances = error %v, want nil", err)
+	}
+	for name, stmt := range map[string]string{
+		"INSERT": `INSERT INTO projection_db.wallet_balances (wallet_id, balance) VALUES (gen_random_uuid(), 1.00)`,
+		"UPDATE": `UPDATE projection_db.wallet_balances SET balance = 1.00`,
+		"DELETE": `DELETE FROM projection_db.wallet_balances`,
+	} {
+		if _, err := ledgerApp.Exec(ctx, stmt); !permissionDenied(err) {
+			t.Errorf("ledger_app %s on wallet_balances = %v, want permission denied (42501)", name, err)
+		}
+	}
+
+	// Explicit versions, not step counts: neither test breaks when a later migration lands.
+	m, err := migrate.New("file://../migrations", ownerDSN+"&x-migrations-table=projection_schema_migrations")
+	if err != nil {
+		t.Fatalf("could not init migrate: %v", err)
+	}
+	if err := m.Migrate(4); err != nil {
+		t.Fatalf("rolling back to 0004: %v", err)
+	}
+	if _, err := ledgerApp.Exec(ctx, `SELECT count(*) FROM projection_db.wallet_balances`); !permissionDenied(err) {
+		t.Errorf("after 0005.down, ledger_app SELECT = %v, want permission denied (42501)", err)
+	}
+	if err := m.Up(); err != nil {
+		t.Fatalf("re-applying 0005: %v", err)
+	}
+	if _, err := ledgerApp.Exec(ctx, `SELECT count(*) FROM projection_db.wallet_balances`); err != nil {
+		t.Errorf("after re-applying 0005, ledger_app SELECT = %v, want nil", err)
 	}
 }
