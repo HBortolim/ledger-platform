@@ -1,0 +1,141 @@
+# Milestone 6 demo transcript -- 2026-11-10, fresh stack (make down && make up)
+# Script: docs/milestones/milestone-6/00-overview.md 'Demo script', run verbatim under 'set -v'.
+# Docker build/compose progress lines removed; everything else is as printed.
+
+# 1. An admin token and a user token (scripts/generate-jwt.sh <user-id> [role])
+USER_ID=00000000-0000-0000-0000-000000000001
+TOKEN=$(./scripts/generate-jwt.sh $USER_ID 2>/dev/null)
+./scripts/generate-jwt.sh $USER_ID 2>/dev/null
+ADMIN=$(./scripts/generate-jwt.sh $USER_ID admin 2>/dev/null)
+./scripts/generate-jwt.sh $USER_ID admin 2>/dev/null
+# 2. A wallet, funded through the front door this time — no hand-posting to the ledger
+WALLET=$(curl -s -X POST http://localhost:8080/wallets -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"currency":"BRL"}' | jq -r .walletId)
+curl -s -X POST http://localhost:8080/wallets -H "Authorization: Bearer $TOKEN"   -H "Content-Type: application/json" -d '{"currency":"BRL"}' | jq -r .walletId
+curl -s -X POST http://localhost:8080/deposits \
+  -H "Authorization: Bearer $ADMIN" -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d "{\"destinationWalletId\":\"$WALLET\",\"amount\":\"500.00\"}" | jq
+uuidgen
+{
+  "transactionId": "cc5acd05-5f77-59c7-a2c8-645246c8b4dc",
+  "status": "COMPLETED",
+  "postedAt": "2026-11-10T21:44:45.014567Z"
+}
+# 3. A non-admin is refused (AC-6.2)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/deposits \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"destinationWalletId\":\"$WALLET\",\"amount\":\"1.00\"}"      # -> 403
+403
+# 4. Lifecycle: freeze blocks transfers, close refuses a funded wallet
+curl -s -X POST http://localhost:8080/wallets/$WALLET/freeze   -H "Authorization: Bearer $TOKEN" -i | head -1
+HTTP/1.1 200 
+curl -s -X POST http://localhost:8080/wallets/$WALLET/unfreeze -H "Authorization: Bearer $TOKEN" -i | head -1
+HTTP/1.1 200 
+curl -s -X POST http://localhost:8080/wallets/$WALLET/close    -H "Authorization: Bearer $TOKEN" | jq   # -> 409 NONZERO_BALANCE
+{
+  "code": "NONZERO_BALANCE",
+  "message": "wallet balance must be zero to close"
+}
+# 5. The audit trail those three calls left behind (NFR-AUDIT-3)
+docker exec ledger-platform-postgres-1 psql -U ledger -d ledger -c \
+  "SELECT wallet_id, actor_id, action, before_state->>'status' AS before, after_state->>'status' AS after, at
+     FROM wallet_db.wallet_audit_log ORDER BY id;"
+              wallet_id               |               actor_id               |  action  | before | after  |              at               
+--------------------------------------+--------------------------------------+----------+--------+--------+-------------------------------
+ 28cc4280-d756-43ad-bf10-30e6adbca2f6 | 00000000-0000-0000-0000-000000000001 | FREEZE   | ACTIVE | FROZEN | 2026-11-10 21:44:45.097765+00
+ 28cc4280-d756-43ad-bf10-30e6adbca2f6 | 00000000-0000-0000-0000-000000000001 | UNFREEZE | FROZEN | ACTIVE | 2026-11-10 21:44:45.115655+00
+(2 rows)
+# 6. THE MONEY SHOT — break a projection on purpose, watch it get caught, then fix it
+#    First wait for the projection to show the step-2 deposit: on a cold stack the consumer is
+#    still joining its group, and corrupting a row that does not exist yet is a silent UPDATE 0.
+until curl -s http://localhost:8080/wallets/$WALLET/balance -H "Authorization: Bearer $TOKEN"   | jq -e '.balance == 500' >/dev/null; do sleep 1; done
+docker exec ledger-platform-postgres-1 psql -U ledger -d ledger -c \
+  "UPDATE projection_db.wallet_balances SET balance = 999999.00 WHERE wallet_id = '$WALLET';"
+UPDATE 1
+# Reconciliation treats a wallet that moved in the last 10s as in-flight, not drifting (NFR-CONS-2),
+# so a scripted run needs the step-2 deposit to have aged past that. Live, this is already true.
+sleep 11
+curl -s -X POST http://localhost:8081/admin/reconciliation/run | jq          # -> drift reported
+{
+  "ranAt": "2026-11-10T21:44:57.384980558Z",
+  "durationMs": 13,
+  "clean": false,
+  "invariant": {
+    "clean": true,
+    "findingCount": 0,
+    "truncated": false,
+    "findings": []
+  },
+  "projection": {
+    "clean": false,
+    "findingCount": 1,
+    "truncated": false,
+    "findings": [
+      {
+        "walletId": "28cc4280-d756-43ad-bf10-30e6adbca2f6",
+        "kind": "MISMATCH",
+        "projected": "999999.00",
+        "actual": "500.00"
+      }
+    ]
+  },
+  "moneySupply": {
+    "clean": true,
+    "ledgerClean": true,
+    "cachedClean": true,
+    "ledgerTotal": "0.00",
+    "cachedTotal": "0.00"
+  }
+}
+docker compose logs --no-log-prefix ledger-service | jq -R 'fromjson? // empty' \
+  | jq -c 'select(.msg | test("drift"))' | tail -5
+{"timestamp":"2026-11-10T21:44:57.398566558Z","level":"ERROR","msg":"reconciliation drift: projection","service":"ledger-service","check":"projection","wallet_id":"28cc4280-d756-43ad-bf10-30e6adbca2f6","kind":"MISMATCH","projected":"999999","actual":"500","trace_id":"fbca52b44b215e65262c4fd70655217a","span_id":"056131364a144648"}
+{"timestamp":"2026-11-10T21:44:57.398717719Z","level":"ERROR","msg":"reconciliation drift detected","service":"ledger-service","invariant_findings":0,"invariant_truncated":false,"projection_findings":1,"projection_truncated":false,"money_supply_unclean_totals":0,"trace_id":"fbca52b44b215e65262c4fd70655217a","span_id":"056131364a144648"}
+curl -s 'http://localhost:8081/metrics' | grep reconciliation_drift_total
+# HELP reconciliation_drift_total Findings reported by drifting reconciliation passes, labeled by check (invariant, projection, money_supply).
+# TYPE reconciliation_drift_total counter
+reconciliation_drift_total{check="invariant"} 0
+reconciliation_drift_total{check="money_supply"} 0
+reconciliation_drift_total{check="projection"} 1
+curl -s -X POST http://localhost:8080/admin/projections/$WALLET/rebuild \
+  -H "Authorization: Bearer $ADMIN" | jq                                     # -> rebuilt from the ledger
+{
+  "walletId": "28cc4280-d756-43ad-bf10-30e6adbca2f6",
+  "balance": 500.00,
+  "entriesApplied": 1,
+  "rebuiltAt": "2026-11-10T21:44:57.570555Z"
+}
+curl -s -X POST http://localhost:8081/admin/reconciliation/run | jq          # -> clean
+{
+  "ranAt": "2026-11-10T21:44:57.609772158Z",
+  "durationMs": 0,
+  "clean": true,
+  "invariant": {
+    "clean": true,
+    "findingCount": 0,
+    "truncated": false,
+    "findings": []
+  },
+  "projection": {
+    "clean": true,
+    "findingCount": 0,
+    "truncated": false,
+    "findings": []
+  },
+  "moneySupply": {
+    "clean": true,
+    "ledgerClean": true,
+    "cachedClean": true,
+    "ledgerTotal": "0.00",
+    "cachedTotal": "0.00"
+  }
+}
+curl -s http://localhost:8080/wallets/$WALLET/balance -H "Authorization: Bearer $TOKEN" | jq
+{
+  "walletId": "28cc4280-d756-43ad-bf10-30e6adbca2f6",
+  "balance": 500.00,
+  "currency": "BRL",
+  "asOf": "2026-11-10T21:44:57.570555Z",
+  "stale": false
+}
