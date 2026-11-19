@@ -80,3 +80,36 @@ jobs:
       - name: Vet
         working-directory: tests/e2e
         run: go vet -tags=e2e ./...
+
+  # The three jobs below check the Milestone 7 artefacts that no test would otherwise exercise.
+  # None needs the compose stack; each runs a pinned tool image, the same tags the repo already uses.
+  load-scripts:
+    name: Load scripts parse (k6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: k6 inspect
+        run: |
+          for f in infrastructure/load/transfer_*.js; do
+            docker run --rm -v "$PWD/infrastructure/load:/scripts:ro" grafana/k6:1.3.0 inspect "/scripts/$(basename "$f")" >/dev/null
+          done
+
+  alerts:
+    name: Alert rules (promtool)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check and test rules
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/infrastructure/observability:/o:ro" \
+            prom/prometheus:v2.52.0 check rules /o/alerts.yml
+          docker run --rm --entrypoint promtool -v "$PWD/infrastructure/observability:/o:ro" \
+            prom/prometheus:v2.52.0 test rules /o/alerts_test.yml
+
+  openapi:
+    name: OpenAPI spec (Redocly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: docker run --rm -v "$PWD/docs/api:/spec:ro" redocly/cli:2.11.1 lint /spec/wallet-service.openapi.yaml

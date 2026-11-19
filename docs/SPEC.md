@@ -19,7 +19,7 @@ The project is done when a reviewer can:
 1. Clone the repo, run `docker compose up`, and have all services healthy within 60 seconds.
 2. Execute a transfer via `curl`, observe the ledger entries in Postgres, the Kafka event, and the updated projection — all within 2 seconds.
 3. Read the `docs/` folder and understand every architectural decision without having to read source code.
-4. Run `make test` and see the full test suite (unit + integration + end-to-end) pass.
+4. Run `make test` (unit + integration) and, against the running stack, `make test-e2e`, and see both pass.
 5. Kill any single service mid-transfer and observe the system recover without financial inconsistency.
 
 ---
@@ -999,7 +999,7 @@ The build order matters. Build vertical slices, not horizontal layers. Each mile
 ```
 ledger-platform/
 ├── README.md                       # quick start, architecture diagram, demo
-├── Makefile                        # make up / down / test / load / clean
+├── Makefile                        # make up / down / test / test-e2e / load / lint / clean
 ├── docker-compose.yml
 ├── docker-compose.observability.yml
 ├── services/
@@ -1018,30 +1018,32 @@ ledger-platform/
 │   │   ├── cmd/
 │   │   ├── internal/
 │   │   └── migrations/             # golang-migrate migrations (ADR-004)
-│   └── notification-service/       # Go, optional
+│   └── notification-service/       # Go, optional; not built
+├── tests/
+│   └── e2e/                        # end-to-end suite against the running stack; also checks responses against the OpenAPI spec
 ├── infrastructure/
 │   ├── kafka/                      # topic creation scripts
 │   ├── observability/
 │   │   ├── prometheus.yml
+│   │   ├── alerts.yml, alerts_test.yml  # alert rules and their promtool tests
 │   │   └── grafana/
-│   └── load/                       # k6 scripts
+│   └── load/                       # k6 profiles and shared library, run from Docker (make load*)
 ├── docs/
 │   ├── architecture/
 │   │   ├── overview.md
-│   │   ├── data-flow.md
-│   │   └── diagrams/
+│   │   └── data-flow.md            # diagrams are Mermaid, inline
 │   ├── decisions/                  # ADRs, numbered
 │   │   ├── 0001-http-not-grpc.md
 │   │   ├── 0002-locking-strategy.md
 │   │   └── ...
-│   ├── api/                        # OpenAPI specs
-│   └── results/                    # load test outputs, screenshots
+│   ├── api/                        # OpenAPI spec for the Wallet API, testing guide
+│   └── results/                    # load and chaos outputs, screenshots, demo transcripts
 ├── scripts/
 │   ├── seed-users.sh
-│   └── generate-jwt.sh
+│   ├── generate-jwt.sh
+│   ├── load.sh, screenshot.sh, verify-trace.sh, sync-postman.sh
 └── .github/workflows/
-    ├── ci.yml
-    └── release.yml
+    └── ci.yml                      # release.yml is not built
 ```
 
 ---
