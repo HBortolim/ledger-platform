@@ -1,11 +1,11 @@
-chaos drills, run 015852, scenarios: 1 2 3 4 5
+chaos drills, run 024627, scenarios: 1 2 3 4 5
 
 === 1. Ledger killed mid-transfer (SPEC 9.3, NFR-AVAIL-2/4)
     inject: kill ledger-service for 20 s under 20 RPS.  expect: 503 + Retry-After, never 500; no partial transaction
-    while down: POST /transfers -> 503, Retry-After: 2 (5.032367s)
+    while down: POST /transfers -> 503, Retry-After: 2 (5.031788s)
     PASS  503 with a Retry-After header while the ledger is down
     ledger back
-    503s served during the drill: 586
+    503s served during the drill: 584
     PASS  no 5xx other than 503 during the drill (NFR-AVAIL-4)
     PASS  transfers succeed again (201) after recovery
     PASS  reconciliation clean: no partial transaction
@@ -13,14 +13,15 @@ chaos drills, run 015852, scenarios: 1 2 3 4 5
 === 2. Kafka killed (SPEC 9.5, NFR-AVAIL-5)
     inject: stop kafka under 40 RPS until OutboxBacklog fires (depth > 1000 for 1 m, plus rule evaluation every 60 s), at most 300 s
     expect: outbox > 1000, OutboxBacklog firing, balances stale
-    t+5s  outbox depth 1
-    t+25s  outbox depth 902
-    t+45s  outbox depth 1709
-    t+65s  outbox depth 2523
-    t+86s  outbox depth 3323
-    t+106s  outbox depth 4144
-    t+116s  OutboxBacklog is FIRING (depth 4691)
-    peak outbox depth 4691; OutboxBacklog firing: yes; GET /balance stale: true
+    t+5s  outbox depth 0
+    t+26s  outbox depth 819
+    t+46s  outbox depth 1626
+    t+66s  outbox depth 2429
+    t+86s  outbox depth 3257
+    t+106s  outbox depth 4064
+    t+127s  outbox depth 4884
+    t+142s  OutboxBacklog is FIRING (depth 5435)
+    peak outbox depth 5435; OutboxBacklog firing: yes; GET /balance stale: true
     PASS  outbox depth passed 1000
     PASS  OutboxBacklog alert fired
     PASS  GET /balance reported stale=true while events were stuck
@@ -42,13 +43,13 @@ chaos drills, run 015852, scenarios: 1 2 3 4 5
 === 4. Wallet killed mid-transfer (SPEC 9.1/9.2, 1.1 #5)
     inject: a burst of transfers with fixed Idempotency-Keys, kill wallet-service mid-burst, restart, replay every key
     expect: every key ends as one 201; exactly one ledger transaction (two entries) per key; none doubled
-burst: 436 keys sent, 412 answered 201, 24 got a connection error (outcome unknown)
+burst: 440 keys sent, 416 answered 201, 24 got a connection error (outcome unknown)
     wallet back; replaying (a PENDING key stays 409 until the 60 s janitor frees it)
-replay: 436/436 keys resolved to 201; 32 replies were 409 IN_PROGRESS (waiting for the janitor); took 63s
+replay: 440/440 keys resolved to 201; 8 replies were 409 IN_PROGRESS (waiting for the janitor); took 62s
     PASS  every key resolved to 201 after the replay
-time="2026-11-18T23:10:27-03:00" level=warning msg="/Users/hbortolim/projetos/ledger-platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
-time="2026-11-18T23:10:27-03:00" level=warning msg="/Users/hbortolim/projetos/ledger-platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
-    keys: 436   ledger transactions for those keys: 436   entries: 872
+WARN[0000] /Users/hbortolim/projetos/ledger-platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+WARN[0000] /Users/hbortolim/projetos/ledger-platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+    keys: 440   ledger transactions for those keys: 440   entries: 880
     PASS  exactly one ledger transaction per idempotency key
     PASS  exactly two entries per key (nothing posted twice)
     PASS  the transferId each key returned is the derived id
@@ -56,11 +57,11 @@ time="2026-11-18T23:10:27-03:00" level=warning msg="/Users/hbortolim/projetos/le
 
 === 5. +200 ms Wallet -> Ledger (SPEC 10.5)
     inject: Toxiproxy latency toxic 200 ms on the Wallet->Ledger link for ~60 s under 20 RPS.  expect: p95 > 200 ms observed, no errors
-    with +200 ms: transfer p95 (Prometheus, last 30 s) = 0.24310514686764706s; a single probe took 0.214975s (status 201)
+    with +200 ms: transfer p95 (Prometheus, last 30 s) = 0.2415919078s; a single probe took 0.220262s (status 201)
     PASS  NFR-PERF-1 violation is observed: p95 above 200 ms
     PASS  no errors while slow (ledger timeout is 5 s)
     latency removed
-    after recovery: transfer p95 = 0.024014445999999988s
+    after recovery: transfer p95 = 0.025683638777777767s
     PASS  p95 back under 200 ms
     PASS  reconciliation clean
 
@@ -71,4 +72,3 @@ time="2026-11-18T23:10:27-03:00" level=warning msg="/Users/hbortolim/projetos/le
     PASS  outbox empty
 
 ALL CHECKS PASSED
-exit=0

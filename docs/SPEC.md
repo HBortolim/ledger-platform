@@ -989,7 +989,7 @@ The build order matters. Build vertical slices, not horizontal layers. Each mile
 - ADRs in `docs/decisions/`.
 - Final README polish.
 
-**Demonstrable:** the project is ready to show to a hiring manager.
+**Demonstrable:** the project is ready to show to a hiring manager. Concretely, shown on 2026-11-19: a fresh clone following only the README reaches a healthy stack in about 30 s and the Quick Demo works (README); the three load profiles pass their gates locally with reconciliation clean ([`docs/results/m7-load-baseline.md`](results/m7-load-baseline.md)); five failure drills under load pass and leave money supply at zero ([`docs/results/m7-chaos.cast`](results/m7-chaos.cast), transcript beside it); every ADR is tracked and indexed and the architecture docs carry diagrams ([`docs/decisions/`](decisions/README.md), [`docs/architecture/`](architecture/overview.md)); the Wallet API has a linted OpenAPI contract checked against live responses ([`docs/api/`](api/README.md)).
 
 **Total: ~28 working days** for a single developer working with focus. Multiply by 2–3× for reality (interruptions, learning, debugging).
 
