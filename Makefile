@@ -44,10 +44,15 @@ test:
 test-e2e:
 	cd tests/e2e && go test -tags=e2e ./...
 
+# Same pinned linter as CI (.github/workflows/ci.yml), run from its image: a host golangci-lint built with an
+# older Go refuses these Go 1.25 modules.
+GOLANGCI_LINT_IMAGE := golangci/golangci-lint:v2.6.2
+golangci = docker run --rm -v "$(CURDIR)/services/$(1):/app" -w /app $(GOLANGCI_LINT_IMAGE) golangci-lint run ./...
+
 lint:
 	$(MAKE) -C services/wallet-service lint
-	cd services/ledger-service && golangci-lint run ./...
-	cd services/projection-service && golangci-lint run ./...
+	$(call golangci,ledger-service)
+	$(call golangci,projection-service)
 	cd tests/e2e && go vet -tags=e2e ./...
 
 fmt:
