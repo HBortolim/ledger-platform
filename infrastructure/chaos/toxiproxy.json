@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ledger",
+    "listen": "0.0.0.0:18081",
+    "upstream": "ledger-service:8081",
+    "enabled": true
+  }
+]

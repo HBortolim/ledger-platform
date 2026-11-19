@@ -1,0 +1,18 @@
+# Failure-injection overlay (Milestone 7, scripts/chaos.sh). Use with the other two files:
+#   make up-chaos
+# Only the Wallet -> Ledger link goes through the proxy, which is the link SPEC 10.5 slows down.
+# Toxiproxy's API is on localhost:8474; with no toxic set it forwards traffic unchanged.
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./infrastructure/chaos/toxiproxy.json:/config/toxiproxy.json:ro
+    ports:
+      - "8474:8474"
+
+  wallet-service:
+    environment:
+      LEDGER_SERVICE_URL: http://toxiproxy:18081
+    depends_on:
+      - toxiproxy

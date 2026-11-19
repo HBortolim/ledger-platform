@@ -1,4 +1,4 @@
-.PHONY: up down up-obs down-obs build test test-e2e load load-throughput load-spike clean lint fmt
+.PHONY: up down up-obs down-obs up-chaos down-chaos chaos build test test-e2e load load-throughput load-spike clean lint fmt
 
 up:
 	docker compose up --build -d
@@ -13,6 +13,19 @@ up-obs:
 
 down-obs:
 	docker compose $(COMPOSE_OBS) down -v
+
+COMPOSE_CHAOS := $(COMPOSE_OBS) -f docker-compose.chaos.yml
+
+# Stack with the observability overlay and a latency proxy on Wallet -> Ledger, for scripts/chaos.sh.
+up-chaos:
+	docker compose $(COMPOSE_CHAOS) up --build -d
+
+down-chaos:
+	docker compose $(COMPOSE_CHAOS) down -v
+
+# Failure drills under load (SPEC.md 10.5). Needs `make up-chaos`; it stops and starts services, so run it on a dev stack.
+chaos:
+	scripts/chaos.sh
 
 build:
 	$(MAKE) -C services/wallet-service build

@@ -109,7 +109,7 @@ The corrupt, reconcile and rebuild story is in the recorded transcript
 
 - **Reconciliation and rebuild:** the [Milestone 6 transcript](docs/results/m6-reconciliation-drift.txt), recorded on a fresh local stack.
 - **Load:** [local baseline](docs/results/m7-load-baseline.md). On a laptop in a Docker VM (environment and caveats in the file), 50 RPS held p95 28 ms and p99 71 ms at the Wallet Service, and 100 TPS ran for 5 minutes with 0 failed requests out of 30,402 and a clean reconciliation. Projection lag stayed under 0.3 s at p99, 0.94 s during the spike to 200 RPS. This shows the NFR-PERF targets are met with headroom locally; it does not find the saturation point, and it is not a deployed-environment result.
-- **Chaos drills:** not recorded yet (Task 04).
+- **Chaos drills:** `make up-chaos && make chaos` kills the Ledger, Kafka, the Projection and the Wallet Service under load and adds 200 ms of Wallet to Ledger latency. [Transcript](docs/results/m7-chaos-transcript.txt) of a full run, all checks passing: 503s with `Retry-After` and no 500s, the `OutboxBacklog` alert firing and then draining, and exactly one ledger transaction per idempotency key after the Wallet Service was killed mid-burst. Money supply stayed at zero. A screen recording is not made yet.
 - **Tracing:** [one transfer across wallet, ledger, outbox publish and projection apply](docs/results/m5-jaeger-end-to-end-trace.png) (Jaeger), and the [Grafana dashboard under a 60 s, 50 RPS run](docs/results/m5-grafana-transfers-overview.png). Local stack, short run; the dashboard is a view of the metrics, not a baseline.
 
 Results will be added here with their environment and a link to the raw output. Nothing is quoted without one.
@@ -119,6 +119,7 @@ Results will be added here with their environment and a link to the raw output. 
 - `make test` — unit + integration test suites for all three services (Testcontainers/dockertest manage their own ephemeral Postgres/Kafka; no `docker compose` stack required).
 - `make up && make test-e2e` — end-to-end suite (`tests/e2e/`) against the full running stack. Requires `make up` first; never run by `make test` or CI.
 - `make load`, `make load-throughput`, `make load-spike` — k6 load profiles, run in Docker against a running stack. Each ends with a reconciliation check that gates the result. Set `BASE_URL`, `LEDGER_URL`, `USER_TOKEN` and `ADMIN_TOKEN` to aim them at another deployment.
+- `make up-chaos && make chaos` — failure drills under load (`scripts/chaos.sh`); stops and starts containers, so use a dev stack.
 - `make lint` and `make fmt` — linters and formatters for every module.
 - If `make test-e2e` fails with 401/403 errors, `keys/private.pem` and `keys/public.pem` are probably an out-of-sync pair. Regenerate both together with `rm -f keys/private.pem keys/public.pem && ./scripts/generate-jwt.sh 00000000-0000-0000-0000-000000000001`, then `docker compose restart wallet-service` if the stack was already running (so it picks up the new public key).
 

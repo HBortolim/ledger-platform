@@ -796,7 +796,7 @@ Test for this is in §10 — TST-CONCURRENCY-1.
 
 State: ledger row committed; outbox row written; publish fails.
 
-Recovery: outbox worker leaves the row, retries on the next tick. Outbox depth metric climbs. An alert fires when `ledger_outbox_depth > 1000`. When Kafka returns, the worker drains.
+Recovery: outbox worker leaves the row, retries on the next tick. Outbox depth metric climbs. The `OutboxBacklog` alert (`infrastructure/observability/alerts.yml`) fires when `ledger_outbox_depth > 1000` holds for a minute; with Prometheus evaluating rules every minute, expect it about two minutes after the depth crosses 1000. When Kafka returns, the worker drains.
 
 Downstream effect: projections lag. The Wallet Service's `GET /balance` starts returning `"stale": true`. Clients can see the system is degraded.
 
@@ -804,7 +804,7 @@ Downstream effect: projections lag. The Wallet Service's `GET /balance` starts r
 
 State: Kafka offset not committed; projection write either committed or not.
 
-Recovery: on restart, the consumer re-reads from the last committed offset. The projection write is idempotent (uses `last_entry_id`), so re-applying the same event is a no-op. No double-counting.
+Recovery: on restart, the consumer re-reads from the last committed offset. The projection write is idempotent by the per-wallet sequence (ADR-0017): an entry whose `seq` is not above the wallet's `last_seq` is skipped, one ahead of it is parked, so re-applying the same event is a no-op. No double-counting.
 
 ### 9.7 Projection drift (the silent killer)
 
@@ -893,11 +893,12 @@ These are the highest-value tests in the whole suite. A reviewer who sees these 
 
 ### 10.5 Chaos tests (stretch goal)
 
-Run during a recorded demo, not in CI:
+Run during a recorded demo, not in CI: `make up-chaos && make chaos` (`scripts/chaos.sh`, a Toxiproxy latency proxy on the Wallet to Ledger link from `docker-compose.chaos.yml`). Each scenario runs under background load, shows what it observes while the system is broken, restores it, and asserts recovery. The script ends with a reconciliation pass and exits non-zero if any check failed.
 
-- Kill the Ledger Service mid-transfer; assert no orphan state.
-- Kill Kafka; assert outbox queues; restart; assert drain.
+- Kill the Ledger Service mid-transfer; assert `503` with `Retry-After`, never `500`, and no orphan state.
+- Kill Kafka; assert the outbox queues and `OutboxBacklog` fires; restart; assert drain.
 - Kill the Projection Service; assert no event loss after restart.
+- Kill the Wallet Service mid-burst of transfers with fixed `Idempotency-Key`s; restart; replay every key; assert each resolves to one outcome and the ledger holds exactly one transaction per key (SPEC 1.1 #5).
 - Add 200 ms network latency between Wallet and Ledger; assert SLO violations are observed in metrics.
 
 ### 10.6 Load tests
