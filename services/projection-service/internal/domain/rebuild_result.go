@@ -1,4 +1,4 @@
-package utils
+package domain
 
 import (
 	"time"
@@ -7,7 +7,8 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type Result struct {
+// RebuildResult is the outcome of rebuilding one wallet's projected balance from the ledger.
+type RebuildResult struct {
 	WalletID       uuid.UUID
 	Balance        decimal.Decimal
 	EntriesApplied int

@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/utils"
+	"github.com/ledger-platform/projection-service/internal/domain"
 )
 
 func init() { gin.SetMode(gin.TestMode) }
@@ -25,11 +25,11 @@ type fakeRebuildService struct {
 	calls     int
 	gotCtx    context.Context
 	gotWallet uuid.UUID
-	result    utils.Result
+	result    domain.RebuildResult
 	err       error
 }
 
-func (f *fakeRebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (utils.Result, error) {
+func (f *fakeRebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (domain.RebuildResult, error) {
 	f.calls++
 	f.gotCtx = ctx
 	f.gotWallet = walletID
@@ -60,7 +60,7 @@ func postRebuild(t *testing.T, svc rebuildService, walletIDPath string) *httptes
 func TestRebuild_ValidWallet_Returns200WithTheDocumentedBody(t *testing.T) {
 	wallet := uuid.New()
 	rebuiltAt := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
-	svc := &fakeRebuildService{result: utils.Result{
+	svc := &fakeRebuildService{result: domain.RebuildResult{
 		WalletID:       wallet,
 		Balance:        decimal.RequireFromString("300.00"),
 		EntriesApplied: 2,
@@ -118,7 +118,7 @@ func TestRebuild_Balance_IsAlwaysRenderedWithTwoDecimals(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			svc := &fakeRebuildService{result: utils.Result{Balance: tc.balance}}
+			svc := &fakeRebuildService{result: domain.RebuildResult{Balance: tc.balance}}
 
 			rec := postRebuild(t, svc, uuid.NewString())
 

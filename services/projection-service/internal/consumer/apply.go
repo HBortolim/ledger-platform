@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/ledger-platform/projection-service/internal/domain"
 	"github.com/ledger-platform/projection-service/internal/sequence"
-	"github.com/ledger-platform/projection-service/internal/utils"
 )
 
 // upsertOffset records the last-processed offset for a consumer group. The
@@ -78,7 +78,7 @@ func applyEvent(ctx context.Context, pool *pgxpool.Pool, event ledgerPostedEvent
 		if err != nil {
 			return eventResult{}, err
 		}
-		out, err := sequence.ApplyEntry(ctx, dbtx, e.AccountID, e.EntryID, seq, utils.SignedDelta(e.EntryType, e.Amount))
+		out, err := sequence.ApplyEntry(ctx, dbtx, e.AccountID, e.EntryID, seq, domain.SignedDelta(e.EntryType, e.Amount))
 		if err != nil {
 			return eventResult{}, err
 		}

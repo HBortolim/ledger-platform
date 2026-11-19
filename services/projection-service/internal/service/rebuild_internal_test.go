@@ -13,8 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/shopspring/decimal"
 
+	"github.com/ledger-platform/projection-service/internal/domain"
 	"github.com/ledger-platform/projection-service/internal/metrics"
-	"github.com/ledger-platform/projection-service/internal/utils"
 )
 
 // ctxKey is unexported so no other package can collide with the test's context value.
@@ -24,11 +24,11 @@ type fakeRebuildRepo struct {
 	calls     int
 	gotCtx    context.Context
 	gotWallet uuid.UUID
-	result    utils.Result
+	result    domain.RebuildResult
 	err       error
 }
 
-func (f *fakeRebuildRepo) Rebuild(ctx context.Context, walletID uuid.UUID) (utils.Result, error) {
+func (f *fakeRebuildRepo) Rebuild(ctx context.Context, walletID uuid.UUID) (domain.RebuildResult, error) {
 	f.calls++
 	f.gotCtx = ctx
 	f.gotWallet = walletID
@@ -37,7 +37,7 @@ func (f *fakeRebuildRepo) Rebuild(ctx context.Context, walletID uuid.UUID) (util
 
 func TestRebuild_Success_ReturnsRepoResultUnchanged(t *testing.T) {
 	wallet := uuid.New()
-	want := utils.Result{
+	want := domain.RebuildResult{
 		WalletID:       wallet,
 		Balance:        decimal.RequireFromString("300.00"),
 		EntriesApplied: 2,
@@ -171,7 +171,7 @@ func TestRebuild_RepoError_CountsAnErrorRebuildAndNothingElse(t *testing.T) {
 func TestRebuild_Success_LogsOneInfoLineWithWalletCountAndBalance(t *testing.T) {
 	logs := captureLogs(t)
 	wallet := uuid.New()
-	repo := &fakeRebuildRepo{result: utils.Result{
+	repo := &fakeRebuildRepo{result: domain.RebuildResult{
 		WalletID:       wallet,
 		Balance:        decimal.RequireFromString("300.5"), // scale 1: the log must still say 300.50
 		EntriesApplied: 2,

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/ledger-platform/projection-service/internal/utils"
+	"github.com/ledger-platform/projection-service/internal/domain"
 )
 
 type RebuildHandler struct {
@@ -14,7 +14,7 @@ type RebuildHandler struct {
 }
 
 type rebuildService interface {
-	Rebuild(ctx context.Context, walletID uuid.UUID) (utils.Result, error)
+	Rebuild(ctx context.Context, walletID uuid.UUID) (domain.RebuildResult, error)
 }
 
 func NewRebuildHandler(svc rebuildService) *RebuildHandler {

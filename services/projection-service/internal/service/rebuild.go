@@ -6,12 +6,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/ledger-platform/projection-service/internal/domain"
 	"github.com/ledger-platform/projection-service/internal/metrics"
-	"github.com/ledger-platform/projection-service/internal/utils"
 )
 
 type RebuildRepository interface {
-	Rebuild(ctx context.Context, walletID uuid.UUID) (utils.Result, error)
+	Rebuild(ctx context.Context, walletID uuid.UUID) (domain.RebuildResult, error)
 }
 
 type RebuildService struct {
@@ -24,7 +24,7 @@ func NewRebuildService(repo RebuildRepository) *RebuildService {
 
 // Rebuild delegates to the repository and makes the outcome observable. That is all this
 // layer adds: no policy, no auth, no audit -- those belong to the Wallet Service (ADR-0016).
-func (s *RebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (utils.Result, error) {
+func (s *RebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (domain.RebuildResult, error) {
 	result, err := s.repo.Rebuild(ctx, walletID)
 	if err != nil {
 		metrics.RebuildsTotal.WithLabelValues("error").Inc()
@@ -33,7 +33,7 @@ func (s *RebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (utils
 		slog.ErrorContext(ctx, "projection rebuild failed",
 			slog.String("wallet_id", walletID.String()),
 			slog.Any("error", err))
-		return utils.Result{}, err
+		return domain.RebuildResult{}, err
 	}
 
 	metrics.RebuildsTotal.WithLabelValues("ok").Inc()

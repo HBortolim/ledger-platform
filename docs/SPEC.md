@@ -1002,7 +1002,10 @@ ledger-platform/
 ├── README.md                       # quick start, architecture diagram, demo
 ├── Makefile                        # make up / down / test / test-e2e / load / lint / clean
 ├── docker-compose.yml
-├── docker-compose.observability.yml
+├── docker-compose.observability.yml   # Jaeger, Prometheus, Grafana overlay
+├── docker-compose.chaos.yml           # Toxiproxy overlay for the failure drills
+├── keys/                           # dev JWT key pair (private key gitignored; make keys creates it)
+├── postman/                        # collection and environments, a convenience next to the OpenAPI spec
 ├── services/
 │   ├── wallet-service/             # Java, Spring Boot
 │   │   ├── src/main/java/...
@@ -1018,11 +1021,14 @@ ledger-platform/
 │   ├── projection-service/         # Go
 │   │   ├── cmd/
 │   │   ├── internal/
-│   │   └── migrations/             # golang-migrate migrations (ADR-004)
-│   └── notification-service/       # Go, optional; not built
+│   │   ├── migrations/             # golang-migrate migrations (ADR-004)
+│   │   ├── tests/
+│   │   └── Dockerfile
+│   └── (notification-service, §5.2: optional, not built)
 ├── tests/
 │   └── e2e/                        # end-to-end suite against the running stack; also checks responses against the OpenAPI spec
 ├── infrastructure/
+│   ├── chaos/                      # Toxiproxy proxy definition
 │   ├── kafka/                      # topic creation scripts
 │   ├── observability/
 │   │   ├── prometheus.yml
@@ -1038,11 +1044,12 @@ ledger-platform/
 │   │   ├── 0002-locking-strategy.md
 │   │   └── ...
 │   ├── api/                        # OpenAPI spec for the Wallet API, testing guide
+│   ├── plans/                      # implementation plans written during Milestone 3
 │   └── results/                    # load and chaos outputs, screenshots, demo transcripts
 ├── scripts/
 │   ├── seed-users.sh
 │   ├── generate-jwt.sh
-│   ├── load.sh, screenshot.sh, verify-trace.sh, sync-postman.sh
+│   ├── chaos.sh, load.sh, screenshot.sh, verify-trace.sh, sync-postman.sh
 └── .github/workflows/
     └── ci.yml                      # release.yml is not built
 ```
