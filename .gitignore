@@ -43,3 +43,6 @@ keys/private.pem
 # VSCode
 .vscode/
 docs/milestones/
+
+# derived by go workspace commands
+go.work.sum
