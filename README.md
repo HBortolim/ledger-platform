@@ -108,7 +108,7 @@ The corrupt, reconcile and rebuild story is in the recorded transcript
 ## Results
 
 - **Reconciliation and rebuild:** the [Milestone 6 transcript](docs/results/m6-reconciliation-drift.txt), recorded on a fresh local stack.
-- **Load:** the harness is in place (`make load`, `make load-throughput`, `make load-spike`). Raw smoke-run output is in [`docs/results/load/`](docs/results/load/). These are short harness checks on a busy laptop, not a baseline. The baseline (Task 02) is not published yet.
+- **Load:** [local baseline](docs/results/m7-load-baseline.md). On a laptop in a Docker VM (environment and caveats in the file), 50 RPS held p95 28 ms and p99 71 ms at the Wallet Service, and 100 TPS ran for 5 minutes with 0 failed requests out of 30,402 and a clean reconciliation. Projection lag stayed under 0.3 s at p99, 0.94 s during the spike to 200 RPS. This shows the NFR-PERF targets are met with headroom locally; it does not find the saturation point, and it is not a deployed-environment result.
 - **Chaos drills:** not recorded yet (Task 04).
 - **Tracing:** [one transfer across wallet, ledger, outbox publish and projection apply](docs/results/m5-jaeger-end-to-end-trace.png) (Jaeger), and the [Grafana dashboard under a 60 s, 50 RPS run](docs/results/m5-grafana-transfers-overview.png). Local stack, short run; the dashboard is a view of the metrics, not a baseline.
 

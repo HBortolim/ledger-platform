@@ -1,0 +1,300 @@
+## 2026-11-19T01:18:29Z
+ledger-platform-wallet-service-1 cpu=324.38% mem=375.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=0.63% mem=15.97MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=15.85% mem=16.11MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=20.99% mem=54.78MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=26.18% mem=52.18MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.12% mem=27.14MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=131.67% mem=356.7MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.08% mem=22.32MiB / 3.893GiB
+ledger-platform-k6-run-e6d3fa307eb3 cpu=8.45% mem=22.64MiB / 3.893GiB
+## 2026-11-19T01:18:39Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.05% mem=26.78MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=54.76% mem=398.5MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.20% mem=18.93MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=5.97% mem=18.82MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.09% mem=54.35MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=16.56% mem=57.16MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=27.33MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=16.28% mem=332MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.10% mem=28MiB / 3.893GiB
+## 2026-11-19T01:18:50Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=6.92% mem=29.09MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=59.81% mem=402.2MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.02% mem=19.83MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.13% mem=22.1MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.05% mem=54.14MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=18.35% mem=60.59MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=27.35MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=32.41% mem=352.5MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.08% mem=34.33MiB / 3.893GiB
+## 2026-11-19T01:19:00Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.96% mem=30.57MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=28.40% mem=403.8MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.99% mem=20.39MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.55% mem=20.41MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=4.47% mem=54.54MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=16.45% mem=62.29MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=27.52MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=17.09% mem=395MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=6.44% mem=42.08MiB / 3.893GiB
+## 2026-11-19T01:19:10Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=5.76% mem=40.6MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=34.51% mem=394.9MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=9.78% mem=23.7MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.93% mem=29.52MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.05% mem=48.45MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=17.15% mem=102.7MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=23.11MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=16.15% mem=377.8MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.05% mem=42.44MiB / 3.893GiB
+## 2026-11-19T01:19:20Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=5.06% mem=40.78MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=57.40% mem=399.6MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.43% mem=26.88MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=5.12% mem=30.01MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.14% mem=48.36MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=14.22% mem=104.3MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.82% mem=23.11MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=18.37% mem=377.9MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.04% mem=51.93MiB / 3.893GiB
+## 2026-11-19T01:19:31Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=5.77% mem=41.27MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=56.59% mem=400.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=12.85% mem=24.85MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.88% mem=30.12MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.24% mem=49.71MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=25.49% mem=106.1MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.88MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=17.76% mem=413.8MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.51% mem=53.93MiB / 3.893GiB
+## 2026-11-19T01:19:41Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.08% mem=41.97MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=21.86% mem=401.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.02% mem=26.72MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.64% mem=30.21MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.13% mem=49.34MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=19.73% mem=108.1MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=23.13MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=13.23% mem=455.6MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.23% mem=60.22MiB / 3.893GiB
+## 2026-11-19T01:19:51Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=6.10% mem=40.34MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=30.65% mem=388.1MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.07% mem=15.3MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=14.83% mem=20.4MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.12% mem=61.95MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=18.51% mem=100.5MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=4.12% mem=22.55MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=23.12% mem=497.1MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.07% mem=63.47MiB / 3.893GiB
+## 2026-11-19T01:20:01Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=9.23% mem=40.93MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=21.38% mem=389.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.37% mem=15.75MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.18% mem=20.85MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.04% mem=65.77MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=17.61% mem=101.9MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=21.89MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=158.70% mem=632.3MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.05% mem=65MiB / 3.893GiB
+## 2026-11-19T01:20:11Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=8.39% mem=40.25MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=40.51% mem=389.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.70% mem=16.59MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.34% mem=20.69MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.14% mem=66.01MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=16.44% mem=102.3MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.21MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=11.60% mem=579.2MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.07% mem=66.02MiB / 3.893GiB
+## 2026-11-19T01:20:22Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.98% mem=40.53MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=21.26% mem=387.5MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.93% mem=17.88MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=9.48% mem=22.67MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.51% mem=65.82MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=18.71% mem=103.1MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.42% mem=22.18MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=15.67% mem=619.6MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.06% mem=73.84MiB / 3.893GiB
+## 2026-11-19T01:20:32Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.30% mem=34.39MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=22.08% mem=399MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.00% mem=23.92MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.21% mem=30.41MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.11% mem=53.2MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=19.68% mem=108.7MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.36MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=10.29% mem=668.3MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=11.17% mem=82.66MiB / 3.893GiB
+## 2026-11-19T01:20:42Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.36% mem=34.66MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=19.30% mem=400.4MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.98% mem=25.14MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=15.54% mem=32.5MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.37% mem=53.38MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=21.26% mem=111MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.40% mem=23.27MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=15.29% mem=711.2MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.25% mem=82.18MiB / 3.893GiB
+## 2026-11-19T01:20:52Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=11.99% mem=35MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=28.52% mem=400.8MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=8.01% mem=25.3MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=10.96% mem=33.07MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.12% mem=53.14MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=23.11% mem=112.3MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.15% mem=23.52MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=63.01% mem=761.9MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.08% mem=82.82MiB / 3.893GiB
+## 2026-11-19T01:21:03Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=7.04% mem=34.86MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=29.01% mem=402.9MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=8.09% mem=25.42MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.74% mem=33.57MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.22% mem=53.52MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=22.69% mem=112.6MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.11% mem=23.27MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=18.75% mem=791.1MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.75% mem=88.81MiB / 3.893GiB
+## 2026-11-19T01:21:13Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.98% mem=34.86MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=17.61% mem=403.2MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.58% mem=25.73MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.66% mem=33.56MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.03% mem=53.5MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=20.90% mem=113.6MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.17% mem=23.27MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=13.20% mem=830.1MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.32% mem=98.57MiB / 3.893GiB
+## 2026-11-19T01:21:23Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.31% mem=43.73MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=17.70% mem=386.2MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.73% mem=16.79MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.80% mem=23.67MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=4.35% mem=44.38MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=22.36% mem=108.8MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.8MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=8.50% mem=856.4MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.05% mem=102.7MiB / 3.893GiB
+## 2026-11-19T01:21:34Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.90% mem=44.35MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=15.24% mem=387MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.32% mem=17.51MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.19% mem=23.27MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.08% mem=44.62MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=17.54% mem=110.3MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.2MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=145.32% mem=947.1MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=2.06% mem=102.8MiB / 3.893GiB
+## 2026-11-19T01:21:44Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.85% mem=44.63MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=17.86% mem=386.6MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=8.24% mem=17.77MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.97% mem=23.53MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.10% mem=43.96MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=23.56% mem=111.7MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.2MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=13.65% mem=858MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.30% mem=103.1MiB / 3.893GiB
+## 2026-11-19T01:21:54Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=12.27% mem=45.81MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=22.66% mem=387.3MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=8.70% mem=18.48MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.73% mem=24.07MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.23% mem=44.15MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=28.64% mem=113.2MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=22.45MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=9.88% mem=858.7MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.57% mem=104.7MiB / 3.893GiB
+## 2026-11-19T01:22:04Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=5.93% mem=41.92MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=18.78% mem=397.2MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=10.78% mem=25.65MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.44% mem=29.23MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.07% mem=58.55MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=22.47% mem=117.3MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=28.89MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=8.86% mem=869.3MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=1.86% mem=128.3MiB / 3.893GiB
+## 2026-11-19T01:22:14Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.14% mem=41.68MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=18.07% mem=398MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.53% mem=25.12MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=10.12% mem=32.03MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.05% mem=60.88MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=21.59% mem=118MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=34.47MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=9.77% mem=867.3MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=2.24% mem=137.4MiB / 3.893GiB
+## 2026-11-19T01:22:25Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=9.10% mem=41.73MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=19.22% mem=398.2MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.04% mem=26.73MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.83% mem=30.78MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.04% mem=60.88MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=22.22% mem=120MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=35.75MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=9.55% mem=870.8MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.12% mem=143.9MiB / 3.893GiB
+## 2026-11-19T01:22:35Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.70% mem=41.87MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=18.45% mem=395.1MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.08% mem=25.79MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=7.74% mem=32.86MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.04% mem=65.7MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=22.51% mem=121.5MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=35.36MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=9.91% mem=867.1MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.09% mem=144.2MiB / 3.893GiB
+## 2026-11-19T01:22:45Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.20% mem=42.25MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=20.04% mem=395.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.20% mem=24.78MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.32% mem=29.47MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.20% mem=65.43MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=23.23% mem=122.5MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=35.39MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=10.31% mem=867.2MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.50% mem=144.5MiB / 3.893GiB
+## 2026-11-19T01:22:55Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=6.84% mem=42.41MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=15.82% mem=383.8MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=5.32% mem=18.72MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=9.86% mem=26.4MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.04% mem=49.96MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=47.35% mem=120.2MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=29.58MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=15.48% mem=864.3MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.55% mem=138.2MiB / 3.893GiB
+## 2026-11-19T01:23:05Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=8.54% mem=42.44MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=22.28% mem=384.1MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=6.42% mem=19.34MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.72% mem=25.61MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.06% mem=50.2MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=25.83% mem=121MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=1.16% mem=29.83MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=15.19% mem=862.2MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.82% mem=138.5MiB / 3.893GiB
+## 2026-11-19T01:23:16Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=3.86% mem=43.22MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=13.77% mem=383.7MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=7.40% mem=17.22MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=6.99% mem=26.32MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.05% mem=49.99MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=17.63% mem=121.5MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=29.58MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=126.44% mem=859.4MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=3.02% mem=146.9MiB / 3.893GiB
+## 2026-11-19T01:23:26Z
+ledger-platform-k6-run-e6d3fa307eb3 cpu=4.04% mem=43.22MiB / 3.893GiB
+ledger-platform-wallet-service-1 cpu=17.20% mem=383.9MiB / 3.893GiB
+ledger-platform-projection-service-1 cpu=8.54% mem=16.79MiB / 3.893GiB
+ledger-platform-ledger-service-1 cpu=8.34% mem=27.06MiB / 3.893GiB
+ledger-platform-grafana-1 cpu=0.07% mem=49.99MiB / 3.893GiB
+ledger-platform-postgres-1 cpu=25.66% mem=122.6MiB / 3.893GiB
+ledger-platform-prometheus-1 cpu=0.00% mem=30.07MiB / 3.893GiB
+ledger-platform-kafka-1 cpu=44.60% mem=889.2MiB / 3.893GiB
+ledger-platform-jaeger-1 cpu=0.05% mem=157.2MiB / 3.893GiB

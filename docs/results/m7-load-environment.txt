@@ -1,0 +1,23 @@
+# Load test environment — recorded 2026-11-19T01:17:12Z
+git SHA: 5e39aef1a03dcf2bc70dd1a5dcbd6f2aed1c7ba4 (working tree: 6 uncommitted paths, none under services/ except a comment-only Java change)
+host: Apple M1, 8 CPU, 8 GB RAM, macOS 26.3
+host load average at start: 4.08 4.36 3.88
+docker: Docker version 29.8.2, build 7fc2dff; VM 8 CPUs, 4179832832 bytes memory, OrbStack
+images:
+  apache/kafka:3.9.1
+  grafana/grafana:10.4.3
+  jaegertracing/jaeger:2.20.0
+  ledger-platform-ledger-service
+  ledger-platform-projection-service
+  ledger-platform-wallet-service
+  migrate/migrate:v4.17.1
+  postgres:16-alpine
+  prom/prometheus:v2.52.0
+pool settings that bound throughput:
+  wallet-service Hikari maximum-pool-size: 20 (services/wallet-service/src/main/resources/application.yml)
+  ledger-service pgx pool_max_conns: 10 (docker-compose.yml)
+  postgres max_connections: server default (100); one instance for all three services
+caveats:
+  - Developer laptop under normal use, not an idle benchmark host: load average ~4 on 8 cores before the runs.
+  - Docker (OrbStack) VM, so numbers include virtualisation overhead; k6 runs on the compose network.
+  - Observability overlay running (Prometheus scraping, Jaeger tracing) during the runs.

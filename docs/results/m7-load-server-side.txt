@@ -1,0 +1,20 @@
+# Server-side figures from Prometheus, over each run's exact window (k6 start..end, from the .txt window files)
+# Quantiles are bucket-interpolated (histogram_quantile over increase()).
+
+## steady  window 305s  (1795051109..1795051414)
+  wallet POST /transfers (NFR-PERF-1): p50=11.639ms p95=28.165ms p99=70.92ms
+  ledger Post (NFR-PERF-2, repository call, not HTTP): p50=2.984ms p95=9.384ms p99=26.375ms
+  projection lag (NFR-PERF-3): p50=0.073s p95=0.219s p99=0.244s
+  wallet /transfers requests in window: 15034.266209783867
+
+## throughput  window 304s  (1795051483..1795051787)
+  wallet POST /transfers (NFR-PERF-1): p50=10.289ms p95=30.68ms p99=73.408ms
+  ledger Post (NFR-PERF-2, repository call, not HTTP): p50=3.075ms p95=9.833ms p99=33.099ms
+  projection lag (NFR-PERF-3): p50=0.082s p95=0.231s p99=0.286s
+  wallet /transfers requests in window: 30400.320003368455
+
+## spike  window 122s  (1795051838..1795051960)
+  wallet POST /transfers (NFR-PERF-1): p50=10.047ms p95=38.413ms p99=96.928ms
+  ledger Post (NFR-PERF-2, repository call, not HTTP): p50=3.195ms p95=15.115ms p99=41.094ms
+  projection lag (NFR-PERF-3): p50=0.137s p95=0.541s p99=0.935s
+  wallet /transfers requests in window: 20335.657142857144
