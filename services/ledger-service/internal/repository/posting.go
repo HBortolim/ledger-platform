@@ -61,7 +61,7 @@ func (r *PostingRepository) Post(ctx context.Context, tx domain.LedgerTransactio
 		return err
 	}
 
-	// Step 3.9: Number each entry within its account's history (SEQ-2/SEQ-3). Safe only because
+	// Step 3.9: Number each entry within its account's history. Safe only because
 	// the row locks from step 2 are still held: the counter read there cannot move before our
 	// commit. Works on a copy so the caller's entries are not mutated.
 	tx.Entries = assignEntrySeqs(tx.Entries, lockedSeqs)
@@ -244,7 +244,7 @@ func lockAccounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (balances map
 
 // assignEntrySeqs returns a copy of entries with Seq set: for each account, the entries get
 // consecutive numbers continuing from that account's counter, in the order they appear in the
-// posting (SEQ-3). lockedSeqs must have been read under the account's row lock (SEQ-2).
+// posting. lockedSeqs must have been read under the account's row lock.
 func assignEntrySeqs(entries []domain.LedgerEntry, lockedSeqs map[uuid.UUID]int64) []domain.LedgerEntry {
 	next := make(map[uuid.UUID]int64, len(lockedSeqs))
 	for id, seq := range lockedSeqs {

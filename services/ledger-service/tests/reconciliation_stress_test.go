@@ -122,7 +122,7 @@ func TestReconciliationStress_ConcurrentPassesNeverOverlap(t *testing.T) {
 // while writers commit deposits and transfers. Every pass must be clean: a posting commits its
 // header, entries and cached balances atomically, so no committed state is unbalanced. Check 2
 // is not exercised here (there is no consumer; the long grace hides every fresh entry) -- it
-// needs a live projection consumer, which is Task 07's e2e.
+// needs a live projection consumer, which the e2e suite covers.
 func TestReconciliationStress_NoFalsePositivesUnderConcurrentPostings(t *testing.T) {
 	f, _, appDSN := newReconFixture(t)
 	ctx := context.Background()

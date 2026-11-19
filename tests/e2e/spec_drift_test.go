@@ -2,7 +2,7 @@
 
 package e2e
 
-// Drift check (M7 Task 06): every response the Wallet Service gives to an e2e request is validated
+// Drift check: every response the Wallet Service gives to an e2e request is validated
 // against docs/api/wallet-service.openapi.yaml. A response whose status, headers or body the spec does
 // not describe fails the run, so the spec cannot silently fall behind the code. Only the shapes the
 // suite already provokes are covered; statuses it never triggers stay unchecked.

@@ -9,7 +9,7 @@ import (
 // EventsProcessedTotal counts LEDGER_POSTED events processed by the
 // consumer, per SPEC.md §7.3. result is one of: applied, skipped, parked, error.
 // parked means no entry of the event applied and at least one was parked behind a gap
-// (Task 08, SEQ-6).
+// .
 // One increment per Kafka event, not per ledger entry within it — see
 // apply.go's applyEvent for why that's the correct unit.
 var EventsProcessedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -26,8 +26,8 @@ var LagSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
 	Buckets: []float64{.05, .1, .25, .5, 1, 2, 5, 10, 30},
 })
 
-// MaxLagSeconds is the SPEC.md §7.3 companion gauge to LagSeconds.
-var MaxLagSeconds = promauto.NewGauge(prometheus.GaugeOpts{
+// LagMaxSeconds is the SPEC.md §7.3 companion gauge to LagSeconds.
+var LagMaxSeconds = promauto.NewGauge(prometheus.GaugeOpts{
 	Name: "projection_lag_max_seconds",
 	Help: "Most recently observed projection lag, in seconds.",
 })
@@ -39,7 +39,7 @@ var ConsumerLag = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Help: "Kafka consumer lag (high watermark minus last committed offset) per topic/partition.",
 }, []string{"topic", "partition"})
 
-// PendingEntries is the number of entries parked behind a gap (Task 08, SEQ-6). It should hover
+// PendingEntries is the number of entries parked behind a gap. It should hover
 // near zero; it rises briefly under normal cross-partition reordering and stays up when an
 // entry was lost. Refreshed periodically by the consumer, so it can lag by a few seconds.
 var PendingEntries = promauto.NewGauge(prometheus.GaugeOpts{
@@ -48,7 +48,7 @@ var PendingEntries = promauto.NewGauge(prometheus.GaugeOpts{
 })
 
 // SeqGapsTotal counts entries that were parked because an earlier entry of their wallet had not
-// arrived (Task 08, SEQ-6). One increment per newly parked entry; redeliveries are not counted.
+// arrived. One increment per newly parked entry; redeliveries are not counted.
 var SeqGapsTotal = promauto.NewCounter(prometheus.CounterOpts{
 	Name: "projection_seq_gaps_total",
 	Help: "Entries parked because an earlier entry of the same wallet had not arrived.",

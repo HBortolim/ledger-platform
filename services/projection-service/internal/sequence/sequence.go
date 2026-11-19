@@ -1,5 +1,5 @@
 // Package sequence applies ledger entries to a wallet's projected balance exactly once, using
-// the ledger's per-account entry number (Task 08, SEQ-4..SEQ-8). It is shared by the consumer
+// the ledger's per-account entry number. It is shared by the consumer
 // and by the rebuild so there is one apply rule and one drain implementation.
 package sequence
 
@@ -17,9 +17,9 @@ import (
 type Decision int
 
 const (
-	Skip  Decision = iota // seq <= lastSeq: already applied (SEQ-5)
-	Apply                 // seq == lastSeq+1: the next entry (SEQ-4)
-	Park                  // seq > lastSeq+1: an earlier entry has not arrived (SEQ-6)
+	Skip  Decision = iota // seq <= lastSeq: already applied
+	Apply                 // seq == lastSeq+1: the next entry
+	Park                  // seq > lastSeq+1: an earlier entry has not arrived
 )
 
 func (d Decision) String() string {
@@ -52,7 +52,7 @@ type Outcome struct {
 	Parked  bool // the entry was newly parked (false for a redelivery of an already-parked entry)
 }
 
-// ApplyEntry applies one entry to walletID inside tx, following SEQ-4..SEQ-7:
+// ApplyEntry applies one entry to walletID inside tx, following ADR-0017:
 // it locks the wallet's row, then skips, applies (and drains) or parks the entry.
 func ApplyEntry(ctx context.Context, tx pgx.Tx, walletID, entryID uuid.UUID, seq int64, delta decimal.Decimal) (Outcome, error) {
 	// Lock first. Without the lock two consumer instances (or the consumer and a rebuild) can
@@ -119,7 +119,7 @@ func advance(ctx context.Context, tx pgx.Tx, walletID, entryID uuid.UUID, seq in
 }
 
 // Drain applies parked entries that have become contiguous with lastSeq, in order, and returns
-// how many it applied (SEQ-7). The caller must hold the wallet's row lock, in the same transaction.
+// how many it applied. The caller must hold the wallet's row lock, in the same transaction.
 func Drain(ctx context.Context, tx pgx.Tx, walletID uuid.UUID, lastSeq int64) (int, error) {
 	drained := 0
 	for {

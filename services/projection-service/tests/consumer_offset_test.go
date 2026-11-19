@@ -14,7 +14,7 @@ import (
 	"github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer"
 )
 
-// Task 08 Finding 2: a failed apply used to leave its offset uncommitted while the loop moved on,
+// A failed apply used to leave its offset uncommitted while the loop moved on,
 // and a Kafka commit is a per-partition high-water mark -- so the next successful record on the
 // partition committed past the failed one, which was never redelivered. These tests fail on
 // that behaviour: the blocked wallet ended with no row, even after a consumer restart.

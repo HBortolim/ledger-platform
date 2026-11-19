@@ -21,7 +21,7 @@ public class ProjectionClient {
 
         try {
             return restClient.post()
-                    // Path matches the Projection Service's own route exactly (Task 04) —
+                    // Path matches the Projection Service's own route exactly —
                     // §9.7's URL is literally the one an operator types; only host and auth differ.
                     .uri("/admin/projections/{walletId}/rebuild", walletId)
                     .exchange((request, response) -> {

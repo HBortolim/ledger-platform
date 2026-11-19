@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Screenshot a page on the compose network with headless Chromium, so nothing is needed on the host
 # (no browser, no npm project). Used for the Grafana dashboard and Jaeger trace screenshots in
-# docs/results/ (M7 Task 03).
+# docs/results/.
 #
 # Usage: scripts/screenshot.sh <url> <out.png> [wait-ms]
 #   <url>     as seen FROM THE COMPOSE NETWORK: http://grafana:3000/..., http://jaeger:16686/...

@@ -5,7 +5,7 @@ public enum AuditAction {
     UNFREEZE(WalletStatus.ACTIVE),
     CLOSE(WalletStatus.CLOSED),
 
-    /** Task 05: an admin rebuilt this wallet's projection. Not a status change. */
+    /** An admin rebuilt this wallet's projection. Not a status change. */
     PROJECTION_REBUILD(null);
 
     private final WalletStatus resultingStatus;

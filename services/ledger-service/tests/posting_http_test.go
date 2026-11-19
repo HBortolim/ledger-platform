@@ -21,7 +21,7 @@ import (
 // TestPostingHTTP exercises POST /ledger/postings and GET
 // /admin/ledger/transactions/:id end-to-end: real gin router, real
 // PostingService, real PostingRepository, real Postgres. This is the
-// SPEC.md §7.1 contract test — Task 04's "done when" criterion.
+// SPEC.md §7.1 contract test.
 //
 // 503 (Postgres genuinely unavailable) is intentionally not exercised here;
 // killing a dockertest container mid-request is too flaky to be worth it.

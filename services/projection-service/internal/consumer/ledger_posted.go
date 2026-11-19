@@ -62,7 +62,7 @@ type LedgerPostedConsumer struct {
 	pool         *pgxpool.Pool
 	kafkaBrokers []string
 	groupID      string
-	alertAfter   time.Duration // a parked entry older than this is a gap that did not fill (SEQ-9)
+	alertAfter   time.Duration // a parked entry older than this is a gap that did not fill
 
 	client *kgo.Client
 	admin  *kadm.Client
@@ -247,10 +247,7 @@ func (c *LedgerPostedConsumer) applyRecord(ctx context.Context, r *kgo.Record) b
 
 	lag := max(time.Since(event.OccurredAt).Seconds(), 0)
 	metrics.LagSeconds.Observe(lag)
-	metrics.MaxLagSeconds.Set(lag)
-
-	// TODO(M6+): publish BALANCE_UPDATED here once a consumer needs it
-	// (notification-service is optional and unbuilt per SPEC.md §5.2).
+	metrics.LagMaxSeconds.Set(lag)
 
 	// The apply is committed in Postgres, so the partition may move on even if this offset commit
 	// fails: a later record's commit covers it, and a redelivery is skipped by its seq.

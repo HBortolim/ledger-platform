@@ -37,12 +37,12 @@ func upsertOffset(ctx context.Context, tx pgx.Tx, group, topic string, partition
 // eventResult is what applyEvent did, for the caller's metrics.
 type eventResult struct {
 	Outcome     string // applied | parked | skipped
-	NewlyParked int    // entries newly parked behind a gap (SEQ-6)
+	NewlyParked int    // entries newly parked behind a gap
 	Touched     bool   // anything was parked or drained, so pending_entries may have changed
 }
 
 // resolveSeq returns the entry's per-account sequence number. A schemaVersion 2 event carries
-// it; a schemaVersion 1 event (published before Task 08, possibly still in Kafka) does not, so
+// it; a schemaVersion 1 event (published before the per-wallet seq existed, possibly still in Kafka) does not, so
 // it is looked up from the ledger -- the entry is committed, so it exists. After this lookup a
 // v1 entry takes exactly the same path as a v2 one: there is one dedupe rule, not two.
 // TODO: delete the lookup once no v1 event can remain within the topic's retention.
@@ -60,7 +60,7 @@ func resolveSeq(ctx context.Context, tx pgx.Tx, e entryEvent) (int64, error) {
 
 // applyEvent applies every entry in event within one DB transaction, records the consumer's
 // last-processed offset in the same transaction, and commits. Each entry is applied, skipped or
-// parked by sequence.ApplyEntry (SEQ-4..SEQ-7). The whole event is classified as a single
+// parked by sequence.ApplyEntry. The whole event is classified as a single
 // outcome, matching the granularity of metrics.EventsProcessedTotal: "applied" if any entry
 // applied (including parked ones its arrival unblocked), "parked" if none applied and any was
 // parked, otherwise "skipped".

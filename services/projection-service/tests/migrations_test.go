@@ -210,7 +210,7 @@ func TestMigration0005_GrantsLedgerAppReadOnly_AndRollsBack(t *testing.T) {
 	}
 }
 
-// TestMigration0006_AlignsWatermark_AndGrantsPendingEntriesNarrowly covers Task 08's projection
+// TestMigration0006_AlignsWatermark_AndGrantsPendingEntriesNarrowly covers the per-wallet sequence
 // migration: last_seq is backfilled from the entry each wallet last applied, projection_app gets
 // exactly SELECT/INSERT/DELETE on pending_entries (parked entries are never updated in place),
 // and .down/.up round-trips.

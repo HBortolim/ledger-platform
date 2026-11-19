@@ -36,7 +36,7 @@ func (r *RebuildRepository) Rebuild(ctx context.Context, walletID uuid.UUID) (do
 	// (sequence.LockWallet) so there is always a row to lock. A concurrent consumer apply for this
 	// wallet then blocks on this same row until we commit and re-reads last_seq, which is the
 	// watermark we are about to write: it skips what our ledger read already covers and applies
-	// anything newer on top. Replay is therefore exact even while the consumer lags (Task 08).
+	// anything newer on top. Replay is therefore exact even while the consumer lags.
 	if _, err := sequence.LockWallet(ctx, tx, walletID); err != nil {
 		return domain.RebuildResult{}, err
 	}
@@ -82,7 +82,7 @@ func (r *RebuildRepository) Rebuild(ctx context.Context, walletID uuid.UUID) (do
 	}
 	rows.Close()
 
-	// Replace the row's values (not merge) and set the watermark to the highest seq replayed (SEQ-8).
+	// Replace the row's values (not merge) and set the watermark to the highest seq replayed.
 	var rebuiltAt time.Time
 	if err := tx.QueryRow(ctx, `
 		UPDATE projection_db.wallet_balances
@@ -98,7 +98,7 @@ func (r *RebuildRepository) Rebuild(ctx context.Context, walletID uuid.UUID) (do
 	}
 
 	// Parked entries at or below the watermark are covered by the replay: discard them. Those
-	// that are now contiguous with it are applied by the same drain the consumer uses (SEQ-8).
+	// that are now contiguous with it are applied by the same drain the consumer uses.
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM projection_db.pending_entries WHERE wallet_id = $1 AND seq <= $2`,
 		walletID, lastSeq); err != nil {

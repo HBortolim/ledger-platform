@@ -72,7 +72,7 @@ tests:
           - exp_labels: {severity: page}
             exp_annotations:
               summary: "No clean reconciliation pass for over 2 hours"
-              description: "Either the job is not running or it keeps finding drift or erroring (Task 06)."
+              description: "Either the job is not running or it keeps finding drift or erroring."
 
   - name: stale stays quiet while passes keep succeeding
     interval: 1m

@@ -212,7 +212,7 @@ type entryFixture struct {
 	// Seq is the entry's per-account sequence number. Zero means "the next number for this
 	// account", assigned by the helper so tests that do not care about ordering stay terse.
 	Seq int64
-	// V1 simulates an event published before Task 08: no seq on the wire (schemaVersion 1).
+	// V1 simulates an event published before seq existed: no seq on the wire (schemaVersion 1).
 	V1 bool
 }
 

@@ -75,7 +75,7 @@ export function transfer(wallets) {
   return res;
 }
 
-// reconcile runs one Ledger Service reconciliation pass (M6 Task 06) and counts a violation for
+// reconcile runs one Ledger Service reconciliation pass and counts a violation for
 // each check that is not clean. Only the checks that hold at any instant are counted: the
 // invariant scan and the money supply are single-snapshot, whereas projection drift ignores
 // wallets that moved in the last 10 s, and a run ends with traffic still settling. A pass already

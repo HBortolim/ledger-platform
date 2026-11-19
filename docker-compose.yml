@@ -150,7 +150,7 @@ services:
       projection-migrate:
         condition: service_completed_successfully
 
-  # Load generator (Milestone 7). Behind a profile so `make up` never starts it; scripts/load.sh runs
+  # Load generator. Behind a profile so `make up` never starts it; scripts/load.sh runs
   # it with `docker compose --profile load run`. Running k6 ON the compose network (not through the
   # host's published ports) keeps Docker Desktop's port-forwarding out of the latency numbers.
   k6:

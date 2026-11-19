@@ -292,7 +292,7 @@ class WalletControllerIT extends BaseIntegrationTest {
         assertThat(walletStatus(walletId, token)).isEqualTo("FROZEN");
     }
 
-    // AC-3.2 + Task 01 BR-A3: idempotent, and the second call adds no audit row.
+    // AC-3.2: idempotent, and the second call adds no audit row.
     @Test
     void freeze_twice_returns200BothTimesAndWritesOneAuditRow() throws Exception {
         UUID userId = UUID.randomUUID();

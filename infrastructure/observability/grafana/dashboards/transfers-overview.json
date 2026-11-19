@@ -189,7 +189,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Projection pending entries / seq gaps",
-      "description": "Task 08 (SEQ-6/SEQ-9). Pending entries should hover near zero: they rise briefly under normal cross-partition reordering and stay up when an entry was lost. Gaps are entries newly parked.",
+      "description": "Pending entries should hover near zero: they rise briefly under normal cross-partition reordering and stay up when an entry was lost. Gaps are entries newly parked.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},

@@ -121,7 +121,7 @@ class RebuildProjectionUseCaseTest {
     }
 
     // A rebuild that succeeds upstream but whose audit insert fails is a 500 and a missing
-    // audit row -- documented as acceptable (Task 05, Step 3) -- not a silently swallowed
+    // audit row -- documented as acceptable -- not a silently swallowed
     // success. The exception must propagate, not be caught and hidden.
     @Test
     void execute_auditInsertFails_propagates() {

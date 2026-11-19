@@ -34,7 +34,7 @@ class ProjectionClientTest {
     @Test
     void rebuild_returns200_mapsToRebuildResult() {
         UUID walletId = UUID.randomUUID();
-        // Path parity with the Projection Service's own route (Task 04, §9.7): this is the
+        // Path parity with the Projection Service's own route: this is the
         // assertion that catches a client hitting the wrong URL and still "succeeding" because
         // WireMock happened to be stubbed loosely.
         wireMock.stubFor(post(urlEqualTo("/admin/projections/" + walletId + "/rebuild"))

@@ -12,7 +12,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-// Regression test for V3__idempotency_status.sql (Task 04).
+// Regression test for V3__idempotency_status.sql.
 class IdempotencyMigrationIT extends BaseIntegrationTest {
 
     @Autowired

@@ -340,7 +340,7 @@ func assertLedgerSchemaHealthy(t *testing.T, ctx context.Context, ownerDSN, appD
 // out of the box — nothing in the current migrations gives it headroom),
 // which checkAvailableBalance has no exemption for and immediately rejects
 // as ErrInsufficientFunds. Giving the external account unlimited/negative
-// balance is a Milestone 6 (deposits/withdrawals) concern, not something
+// balance is a deposit/withdrawal concern, not something
 // this test fixture should work around. Seeding fixture state directly also
 // keeps balance setup decoupled from the exact code path under test.
 func seedAccountBalance(t *testing.T, pool *pgxpool.Pool, accountID uuid.UUID, amount string) {

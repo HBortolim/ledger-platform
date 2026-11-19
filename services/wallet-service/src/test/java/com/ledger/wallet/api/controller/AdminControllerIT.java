@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // WireMock stands in for the Projection Service, same pattern TransferControllerIT uses for the
-// Ledger Service -- "the Projection Service really rebuilds" is Task 04/07's job against the
+// Ledger Service -- "the Projection Service really rebuilds" is the e2e suite's job against the
 // real compose stack. This IT is the Wallet Service's half: auth gate, path parity, degradation.
 class AdminControllerIT extends BaseIntegrationTest {
 
@@ -104,7 +104,7 @@ class AdminControllerIT extends BaseIntegrationTest {
         assertThat(auditRowCount(walletId, "PROJECTION_REBUILD")).isEqualTo(1);
     }
 
-    // §9.7 audit event, with both state columns NULL (Task 01 BR-A11): this is not a status
+    // §9.7 audit event, with both state columns NULL: this is not a status
     // transition.
     @Test
     void rebuild_adminToken_auditRowHasNullStates() throws Exception {
@@ -150,7 +150,7 @@ class AdminControllerIT extends BaseIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // §5.2 / Task 04: no wallet on the Wallet Service's own side gates this -- it is the
+    // §5.2: no wallet on the Wallet Service's own side gates this -- it is the
     // Projection Service that is the source of truth for whether a wallet's projection exists.
     // An unknown wallet here still needs an owner-agnostic lookup in the Wallet Service's own
     // table; since none exists, the admin gate itself is what this test actually isolates.

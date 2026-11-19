@@ -15,7 +15,7 @@ import (
 )
 
 // findDrift polls reconciliation until wallet appears in projection.findings or the deadline
-// passes. A wallet that moved in the last 10s is treated as in-flight, not drifting (Task 06's
+// passes. A wallet that moved in the last 10s is treated as in-flight, not drifting (the reconciliation
 // grace period), so the first passes are expected to be clean; a 409 (a pass already running)
 // is simply retried.
 func findDrift(t *testing.T, wallet uuid.UUID, deadline time.Duration) (kind, projected, actual string, ok bool) {
@@ -106,7 +106,7 @@ func TestE2E_ProjectionRebuild(t *testing.T) {
 	}
 }
 
-// TestE2E_RebuildDuringConsumerLagDoesNotDoubleCount is Task 08's scenario against the real stack:
+// TestE2E_RebuildDuringConsumerLagDoesNotDoubleCount is the per-wallet-sequence scenario against the real stack:
 // deposits commit while the projection cannot see them, an operator rebuilds, and then the
 // lagging events arrive. The balance must equal the ledger, not the ledger plus the replay.
 //

@@ -41,7 +41,7 @@ func (c *LedgerPostedConsumer) reportPendingLoop(ctx context.Context) {
 	}
 }
 
-// ReportPending refreshes the gauge and raises SEQ-9: an error log, naming the wallet and the
+// ReportPending refreshes the gauge and raises an error log, naming the wallet and the
 // missing seq, for every wallet whose oldest parked entry is older than the alert threshold. It
 // never blocks, retries or guesses across the gap -- the recovery is a rebuild. Exported so
 // integration tests can drive it deterministically.

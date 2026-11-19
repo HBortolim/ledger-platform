@@ -36,7 +36,7 @@ func (f *fakeRebuildService) Rebuild(ctx context.Context, walletID uuid.UUID) (d
 	return f.result, f.err
 }
 
-// rebuildResponse is the documented 200 body (Task 04, Step 4).
+// rebuildResponse is the documented 200 body.
 type rebuildResponse struct {
 	WalletID       string    `json:"walletId"`
 	Balance        string    `json:"balance"`

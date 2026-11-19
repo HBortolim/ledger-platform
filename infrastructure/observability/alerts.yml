@@ -11,7 +11,7 @@ groups:
           summary: "Outbox backlog: {{ $value }} unpublished events"
           description: "Projections lag and GET /balance reports stale until Kafka returns and the worker drains (SPEC 9.5, NFR-AVAIL-5)."
 
-      # Task 06: drift_total adds the true finding count on every drifting pass, so alert on the
+      # drift_total adds the true finding count on every drifting pass, so alert on the
       # increase, not the absolute value. The 2h window covers two hourly passes.
       - alert: ReconciliationDrift
         expr: increase(ledger_reconciliation_drift_total[2h]) > 0
@@ -37,9 +37,9 @@ groups:
           severity: page
         annotations:
           summary: "No clean reconciliation pass for over 2 hours"
-          description: "Either the job is not running or it keeps finding drift or erroring (Task 06)."
+          description: "Either the job is not running or it keeps finding drift or erroring."
 
-      # Task 08 SEQ-9: parking is transient under normal cross-partition reordering (seconds). A
+      # Parking is transient under normal cross-partition reordering (seconds). A
       # wallet still parked after 2 minutes is a gap that did not fill; recovery is a rebuild.
       - alert: ProjectionGapStuck
         expr: projection_pending_entries > 0

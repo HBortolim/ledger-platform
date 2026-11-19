@@ -2,7 +2,7 @@
 
 // Package e2e drives the full docker-compose stack through real HTTP, direct
 // Postgres reads, and direct Kafka consumption — SPEC.md §10.3's TST-E2E-1..4 and
-// TST-E2E-6, plus Milestone 6's deposits, withdrawals, wallet lifecycle,
+// TST-E2E-6, plus deposits, withdrawals, wallet lifecycle,
 // reconciliation and rebuild-during-lag scenarios.
 // Run via `make test-e2e` after `make up`; never invoked by `make test` or CI
 // (no compose orchestration there). Requires keys/private.pem to already
@@ -31,7 +31,7 @@ const (
 	ledgerBaseURL = "http://localhost:8081"
 	postgresDSN   = "postgres://ledger_app:ledger_app@localhost:5432/ledger?sslmode=disable"
 	// ownerDSN is the database owner. ledger_app (postgresDSN) cannot write projection_db or
-	// read wallet_db, and two M6 tests must: corrupting a projection on purpose (TST-E2E-6) and
+	// read wallet_db, and two tests must: corrupting a projection on purpose (TST-E2E-6) and
 	// reading the wallet audit log.
 	ownerDSN    = "postgres://ledger:ledger@localhost:5432/ledger?sslmode=disable"
 	kafkaBroker = "localhost:9092"
@@ -121,7 +121,7 @@ func newWallet(t *testing.T, token string, ownerID uuid.UUID) uuid.UUID {
 }
 
 // seedDeposit funds destinationWallet through the public API: an admin POST /deposits (FR-6).
-// Every test that funds a wallet therefore also exercises Task 03's endpoint.
+// Every test that funds a wallet therefore also exercises the deposit endpoint.
 func seedDeposit(t *testing.T, destinationWallet uuid.UUID, amount string) {
 	t.Helper()
 	_, admin := newAdmin(t)
@@ -181,7 +181,7 @@ func walletAction(t *testing.T, token string, walletID uuid.UUID, action string)
 	return postWithKey(t, fmt.Sprintf("%s/wallets/%s/%s", walletBaseURL, walletID, action), token, "", "")
 }
 
-// rebuildProjection hits the Wallet Service's admin rebuild (Task 05) -- the path an operator
+// rebuildProjection hits the Wallet Service's admin rebuild -- the path an operator
 // uses -- not the Projection Service's internal one.
 func rebuildProjection(t *testing.T, token string, walletID uuid.UUID) (*http.Response, string) {
 	t.Helper()
@@ -210,7 +210,7 @@ func ownerExec(t *testing.T, sql string, args ...any) {
 	}
 }
 
-// reconciliationReport is Task 06's report contract (handler/reconciliation.go).
+// reconciliationReport is the reconciliation report contract (handler/reconciliation.go).
 type reconciliationReport struct {
 	Clean     bool `json:"clean"`
 	Invariant struct {

@@ -132,7 +132,7 @@ func TestRebuild(t *testing.T) {
 		}
 	})
 
-	// Task 08: replay follows seq (the true per-wallet commit order), not created_at -- which is
+	// Replay follows seq (the true per-wallet commit order), not created_at -- which is
 	// the transaction START time and can disagree with commit order -- and not the uuid.
 	t.Run("replay follows seq, not created_at or insertion order", func(t *testing.T) {
 		wallet := uuid.New()
@@ -307,14 +307,10 @@ func TestRebuild_LedgerReadFailure_RollsBackTheDelete(t *testing.T) {
 	}
 }
 
-// TestRebuild_ThenLedgerEvent_AppliesOnTopExactlyOnce is Step 3's concurrency claim, tested end
-// to end through the real consumer: after a rebuild,
-//   - a redelivery of the entry the rebuild already folded in is a no-op (last_entry_id matches), and
+// TestRebuild_ThenLedgerEvent_AppliesOnTopExactlyOnce tests, end to end through the real consumer,
+// that after a rebuild:
+//   - a redelivery of an entry the rebuild already folded in is skipped (its seq is not above last_seq), and
 //   - an entry that arrives afterwards is applied on top, not dropped.
-//
-// It deliberately does NOT cover a consumer event for an EARLIER entry than last_entry_id: the
-// consumer's guard only remembers the last entry, so that case would double-apply (the known
-// limitation recorded in Task 04, Step 3).
 func TestRebuild_ThenLedgerEvent_AppliesOnTopExactlyOnce(t *testing.T) {
 	ownerDSN, appDSN := setupProjectionDB(t)
 	bootstrap := setupKafka(t)

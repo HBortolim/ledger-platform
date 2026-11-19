@@ -16,9 +16,8 @@ import (
 )
 
 // TestPostingConcurrency smoke-tests the SELECT ... FOR UPDATE locking
-// described in ADR-002. The full 50-iteration TST-CONCURRENCY suite is
-// Milestone 4's scope — these are cheaper guards that the locking path
-// pulled forward by decision #4 actually works.
+// described in ADR-002. The full 50-iteration TST-CONCURRENCY suite lives
+// elsewhere; these are cheaper guards that the locking path actually works.
 func TestPostingConcurrency(t *testing.T) {
 	_, appDSN := setupLedgerDB(t)
 	ctx := context.Background()

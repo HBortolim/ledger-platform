@@ -44,7 +44,7 @@ func entryCounter(t *testing.T, pool *pgxpool.Pool, account uuid.UUID) int64 {
 	return n
 }
 
-// TestEntrySequence covers SEQ-1..SEQ-3: Post numbers each account's entries 1, 2, 3, ... in
+// TestEntrySequence covers per-account entry numbering: Post numbers each account's entries 1, 2, 3, ... in
 // posting order, the lock row's counter tracks it, and a rejected posting consumes nothing.
 func TestEntrySequence(t *testing.T) {
 	_, appDSN := setupLedgerDB(t)
@@ -150,7 +150,7 @@ func TestEntrySequence(t *testing.T) {
 	})
 }
 
-// TestEntrySequence_ConcurrentPostingsToOneWallet is the test SEQ-2 exists for: many goroutines
+// TestEntrySequence_ConcurrentPostingsToOneWallet is the test the per-account row lock exists for: many goroutines
 // post to the same wallets at once and every account must end up with exactly 1..N, no
 // duplicates, no gaps. The UNIQUE (account_id, seq) constraint makes a double-assignment fail a
 // posting loudly, so a clean run also proves the counter was read under the lock.
@@ -273,7 +273,7 @@ func TestMigration0006_BackfillsHistory(t *testing.T) {
 		t.Errorf("oldest entry seq = %d, err=%v, want 1", firstSeq, err)
 	}
 
-	// The unique constraint is the database-level guarantee of SEQ-1.
+	// The unique constraint is the database-level guarantee that an account's seq is unique.
 	if _, err := pool.Exec(ctx, `UPDATE ledger_db.ledger_entries SET seq = 1 WHERE id = $1`, aEntries[2]); err == nil {
 		t.Error("duplicate (account_id, seq) was accepted, want a unique violation")
 	}

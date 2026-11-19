@@ -14,7 +14,7 @@ type Config struct {
 	AppPort      string
 
 	// PendingEntryAlertAfter is how long an entry may sit in pending_entries before the consumer
-	// logs an error naming the wallet and the missing seq (Task 08, SEQ-9).
+	// logs an error naming the wallet and the missing seq.
 	PendingEntryAlertAfter time.Duration
 }
 

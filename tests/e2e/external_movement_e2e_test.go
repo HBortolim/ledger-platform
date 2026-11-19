@@ -12,7 +12,7 @@ import (
 )
 
 // movementTransactionID reads a deposit/withdrawal response. Movements answer
-// {"transactionId", "status", "postedAt"} (Task 03), unlike transfers' "transferId".
+// {"transactionId", "status", "postedAt"}, unlike transfers' "transferId".
 func movementTransactionID(t *testing.T, body string) uuid.UUID {
 	t.Helper()
 	var r struct {
@@ -118,7 +118,7 @@ func TestE2E_DepositIdempotency(t *testing.T) {
 
 // TestE2E_MoneySupplyHoldsAfterExternalMovements: after deposits, a transfer and a withdrawal,
 // the system as a whole still holds zero net (NFR-CONS-5), observed through reconciliation.
-// Needs a stack started fresh with `make down && make up` (Task 06's zeroed system seed).
+// Needs a stack started fresh with `make down && make up` (the system account seeds at zero).
 func TestE2E_MoneySupplyHoldsAfterExternalMovements(t *testing.T) {
 	userID := uuid.New()
 	token := signJWT(t, userID, "user")

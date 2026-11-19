@@ -107,7 +107,7 @@ reconcile_clean() { # polls: projection findings ignore wallets that moved in th
   REPORT="$r"; return 1
 }
 
-# --- background load (the Task 01 steady profile at a low rate) --------------------------------
+# --- background load (the steady k6 profile at a low rate) --------------------------------
 
 load_start() { # load_start <rate> <seconds> <tag>
   RATE="$1" DURATION="${2}s" POOL_SIZE=40 LOAD_RESULTS_DIR="$PWD/$OUT/k6" \

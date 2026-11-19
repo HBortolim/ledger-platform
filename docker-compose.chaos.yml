@@ -1,4 +1,4 @@
-# Failure-injection overlay (Milestone 7, scripts/chaos.sh). Use with the other two files:
+# Failure-injection overlay (scripts/chaos.sh). Use with the other two files:
 #   make up-chaos
 # Only the Wallet -> Ledger link goes through the proxy, which is the link SPEC 10.5 slows down.
 # Toxiproxy's API is on localhost:8474; with no toxic set it forwards traffic unchanged.

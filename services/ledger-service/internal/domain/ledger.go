@@ -30,7 +30,7 @@ type LedgerEntry struct {
 	AccountID     uuid.UUID
 	EntryType     EntryType
 	Amount        Money
-	// Seq is the 1-based position of this entry in its account's history (SEQ-1). It is
+	// Seq is the 1-based position of this entry in its account's history. It is
 	// assigned by PostingRepository.Post under the account's row lock; callers leave it zero.
 	Seq       int64
 	CreatedAt time.Time

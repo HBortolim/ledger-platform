@@ -28,7 +28,7 @@ type entryEvent struct {
 	EntryType string          `json:"entryType"`
 	Amount    decimal.Decimal `json:"amount"`
 	// Seq is the entry's position in its account's history. schemaVersion 1 events (published
-	// before Task 08) have no seq and read as 0; see applyEvent for the lookup that fills it in.
+	// before seq existed) have no seq and read as 0; see applyEvent for the lookup that fills it in.
 	Seq int64 `json:"seq"`
 }
 
