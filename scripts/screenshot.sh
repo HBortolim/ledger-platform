@@ -14,7 +14,9 @@
 #   scripts/screenshot.sh 'http://grafana:3000/d/transfers-overview?kiosk&from=now-15m&to=now' m7-grafana.png 8000
 #   scripts/screenshot.sh "http://jaeger:16686/trace/$TRACE_ID" m5-jaeger-end-to-end-trace.png
 #
-# Env: COMPOSE_NETWORK (default: <compose project>_default, i.e. ledger-platform_default)
+# Env: VIEWPORT (default "1600, 1000"; a tall one such as "1600, 2300" shows a long Grafana dashboard)
+#      NET_FROM_SERVICE (optional: join this compose service's network namespace instead of the network)
+#      COMPOSE_NETWORK (default: <compose project>_default, i.e. ledger-platform_default)
 #      PLAYWRIGHT_VERSION (default 1.56.1, must match the image tag below)
 set -euo pipefail
 
@@ -32,19 +34,29 @@ case "$OUT" in
 esac
 mkdir -p "$ROOT/$(dirname "$OUT_REL")"
 
-if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
-  echo "compose network '$NETWORK' not found. Is the stack up (make up-obs)? Set COMPOSE_NETWORK to override." >&2
-  exit 1
+if [ -n "${NET_FROM_SERVICE:-}" ]; then
+  cid="$(docker ps -q --filter "label=com.docker.compose.service=${NET_FROM_SERVICE}" \
+    --filter "label=com.docker.compose.project=$(basename "$ROOT")" | head -1)"
+  [ -n "$cid" ] || { echo "no running compose service '${NET_FROM_SERVICE}' (make up-obs?)" >&2; exit 1; }
+  net=(--network "container:${cid}")
+else
+  if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
+    echo "compose network '$NETWORK' not found. Is the stack up (make up-obs)? Set COMPOSE_NETWORK to override." >&2
+    exit 1
+  fi
+  net=(--network "$NETWORK")
 fi
 
 # --ipc=host: Chromium needs a larger /dev/shm than Docker's 64 MB default (Playwright's guidance).
+# --lang: the image's locale is `en-US@posix`, which Chromium rejects (Grafana then fails to start).
 # The repo is mounted at /work and the capture is written straight into it.
 docker run --rm --ipc=host \
-  --network "$NETWORK" \
+  "${net[@]}" \
   -v "$ROOT:/work" -w /tmp \
   "mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble" \
   npx -y "playwright@${PLAYWRIGHT_VERSION}" screenshot \
-    --viewport-size "1600, 1000" \
+    --viewport-size "${VIEWPORT:-1600, 1000}" \
+    --lang en-US \
     --wait-for-timeout "$WAIT_MS" \
     --full-page \
     "$URL" "/work/$OUT_REL"

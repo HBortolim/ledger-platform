@@ -110,7 +110,7 @@ The corrupt, reconcile and rebuild story is in the recorded transcript
 - **Reconciliation and rebuild:** the [Milestone 6 transcript](docs/results/m6-reconciliation-drift.txt), recorded on a fresh local stack.
 - **Load:** the harness is in place (`make load`, `make load-throughput`, `make load-spike`). Raw smoke-run output is in [`docs/results/load/`](docs/results/load/). These are short harness checks on a busy laptop, not a baseline. The baseline (Task 02) is not published yet.
 - **Chaos drills:** not recorded yet (Task 04).
-- **Trace screenshot:** not captured yet (Task 03).
+- **Tracing:** [one transfer across wallet, ledger, outbox publish and projection apply](docs/results/m5-jaeger-end-to-end-trace.png) (Jaeger), and the [Grafana dashboard under a 60 s, 50 RPS run](docs/results/m5-grafana-transfers-overview.png). Local stack, short run; the dashboard is a view of the metrics, not a baseline.
 
 Results will be added here with their environment and a link to the raw output. Nothing is quoted without one.
 
