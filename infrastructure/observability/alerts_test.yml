@@ -36,7 +36,7 @@ tests:
   - name: reconciliation drift fires on increase, not on a flat counter
     interval: 15m
     input_series:
-      - series: 'reconciliation_drift_total{check="projection"}'
+      - series: 'ledger_reconciliation_drift_total{check="projection"}'
         values: '0 0 0 1 1 1 1 1 1 1 1'
     alert_rule_test:
       - eval_time: 30m
@@ -60,7 +60,7 @@ tests:
   - name: stale fires when the last clean pass is over 2h old
     interval: 1m
     input_series:
-      - series: 'reconciliation_last_success_timestamp'
+      - series: 'ledger_reconciliation_last_success_timestamp'
         values: '100x300'             # last clean pass at t=100s, never advanced since (promtool's time() starts at 0)
     alert_rule_test:
       - eval_time: 1h
@@ -77,7 +77,7 @@ tests:
   - name: stale stays quiet while passes keep succeeding
     interval: 1m
     input_series:
-      - series: 'reconciliation_last_success_timestamp'
+      - series: 'ledger_reconciliation_last_success_timestamp'
         values: '60+60x300'           # advances 60s per minute: always "just now"
     alert_rule_test:
       - eval_time: 3h
@@ -87,7 +87,7 @@ tests:
   - name: stale stays quiet on a fresh stack that has never had a clean pass (gauge is 0)
     interval: 1m
     input_series:
-      - series: 'reconciliation_last_success_timestamp'
+      - series: 'ledger_reconciliation_last_success_timestamp'
         values: '0x300'
     alert_rule_test:
       - eval_time: 3h

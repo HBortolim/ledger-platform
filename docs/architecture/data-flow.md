@@ -162,7 +162,7 @@ sequenceDiagram
     L->>DB: 2. projection vs ledger per wallet (10 s grace for in-flight entries)
     L->>DB: 3. ledger total and cached total are each exactly zero
     L-->>Op: 200 with the report, clean true or false
-    Note over L: drift logs at error level and increments reconciliation_drift_total
+    Note over L: drift logs at error level and increments ledger_reconciliation_drift_total
 
     Op->>W: POST /admin/projections/{walletId}/rebuild (admin JWT)
     W->>P: POST /admin/projections/{walletId}/rebuild

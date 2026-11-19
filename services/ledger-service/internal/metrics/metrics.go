@@ -37,17 +37,17 @@ var OutboxPublishFailures = promauto.NewCounterVec(prometheus.CounterOpts{
 // result: ok, drift or error. A pass refused because another is running is not a
 // pass and is not counted.
 var ReconciliationRunsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "reconciliation_runs_total",
+	Name: "ledger_reconciliation_runs_total",
 	Help: "Total reconciliation passes, labeled by result (ok, drift, error).",
 }, []string{"result"})
 
 // ReconciliationDriftTotal is SPEC.md §7.6's RECONCILIATION_DRIFT in Prometheus naming.
 // Each drifting pass adds the true finding count (not the sample length) for the check;
 // for money_supply it adds the number of non-zero totals (0-2). Persistent drift keeps
-// adding on every pass, so alert on increase(reconciliation_drift_total[2h]) > 0, not
+// adding on every pass, so alert on increase(ledger_reconciliation_drift_total[2h]) > 0, not
 // on the absolute value.
 var ReconciliationDriftTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "reconciliation_drift_total",
+	Name: "ledger_reconciliation_drift_total",
 	Help: "Findings reported by drifting reconciliation passes, labeled by check (invariant, projection, money_supply).",
 }, []string{"check"})
 
@@ -55,14 +55,14 @@ var ReconciliationDriftTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 // passes do not advance it, so "time since last success" grows both when the job has
 // died and when drift persists.
 var ReconciliationLastSuccess = promauto.NewGauge(prometheus.GaugeOpts{
-	Name: "reconciliation_last_success_timestamp",
+	Name: "ledger_reconciliation_last_success_timestamp",
 	Help: "Unix timestamp of the last clean reconciliation pass.",
 })
 
 // ReconciliationDuration observes the wall-clock time of the checks in a pass,
 // excluding the wait for the pass lock.
 var ReconciliationDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name: "reconciliation_duration_seconds",
+	Name: "ledger_reconciliation_duration_seconds",
 	Help: "Wall-clock duration of a reconciliation pass.",
 })
 

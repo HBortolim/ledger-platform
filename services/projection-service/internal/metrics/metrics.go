@@ -28,7 +28,7 @@ var LagSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
 
 // MaxLagSeconds is the SPEC.md §7.3 companion gauge to LagSeconds.
 var MaxLagSeconds = promauto.NewGauge(prometheus.GaugeOpts{
-	Name: "max_projection_lag_seconds",
+	Name: "projection_lag_max_seconds",
 	Help: "Most recently observed projection lag, in seconds.",
 })
 

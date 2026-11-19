@@ -117,7 +117,7 @@
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "max_projection_lag_seconds",
+          "expr": "projection_lag_max_seconds",
           "legendFormat": "last observed"
         }
       ]
@@ -207,7 +207,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (result) (increase(reconciliation_runs_total[1h]))", "legendFormat": "{{result}}"}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (result) (increase(ledger_reconciliation_runs_total[1h]))", "legendFormat": "{{result}}"}
       ]
     },
     {
@@ -219,7 +219,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (check) (increase(reconciliation_drift_total[2h]))", "legendFormat": "{{check}}"}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (check) (increase(ledger_reconciliation_drift_total[2h]))", "legendFormat": "{{check}}"}
       ]
     },
     {
@@ -231,7 +231,7 @@
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
       "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 0}}, "overrides": []},
       "targets": [
-        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "time() - (reconciliation_last_success_timestamp > 0)", "legendFormat": "since last clean pass"}
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "time() - (ledger_reconciliation_last_success_timestamp > 0)", "legendFormat": "since last clean pass"}
       ]
     }
   ]

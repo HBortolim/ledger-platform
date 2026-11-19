@@ -693,7 +693,7 @@ Consumed by: Notification Service
 | Projection | `projection_seq_gaps_total` | counter | — |
 | Projection | `projection_consumer_lag` | gauge | topic, partition |
 
-Note on cardinality: `projection_lag_seconds` per wallet would explode. Track it as a histogram across all wallets and a separate `max_projection_lag_seconds` gauge.
+Note on cardinality: `projection_lag_seconds` per wallet would explode. Track it as a histogram across all wallets and a separate `projection_lag_max_seconds` gauge.
 
 ### 7.5 Outbox worker behavior
 
