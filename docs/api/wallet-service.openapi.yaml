@@ -516,18 +516,26 @@ paths:
       operationId: getReadiness
       summary: Readiness probe
       description: |
-        Currently reports `UP` whenever the process is serving; it does **not** check the database
-        yet (there is a TODO in the controller), so it never returns `503`. No authentication.
+        Pings the database (bounded to 2 seconds, so a saturated pool cannot hang the probe) and
+        answers `503` with `{"status": "DOWN"}` when it does not respond. No authentication.
       security: []
       responses:
         '200':
-          description: The process is serving requests.
+          description: The service can reach its database.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthStatus'
               example:
                 status: UP
+        '503':
+          description: The database did not answer within 2 seconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: DOWN
 components:
   securitySchemes:
     bearerAuth:

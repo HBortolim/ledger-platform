@@ -5,8 +5,8 @@ wallet-service.openapi.yaml:
   # (and drop this entry) when one does.
   no-server-example.com:
     - '#/servers/0/url'
-  # The health probes have no failure response: /health/live and /health/ready answer 200 or the
-  # process is not serving at all, and neither requires authentication.
+  # The health probes take no input and need no authentication, so neither can answer a 4xx;
+  # /health/ready's failure is a 503.
   operation-4xx-response:
     - '#/paths/~1health~1live/get/responses'
     - '#/paths/~1health~1ready/get/responses'
