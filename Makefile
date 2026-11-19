@@ -1,6 +1,11 @@
-.PHONY: up down up-obs down-obs up-chaos down-chaos chaos build test test-e2e load load-throughput load-spike clean lint fmt
+# keys: the JWT key pair the Wallet Service verifies with. keys/private.pem is gitignored, so a fresh clone
+# has none; the services read keys/public.pem when they start, so the pair must exist before `up`.
+.PHONY: keys up down up-obs down-obs up-chaos down-chaos chaos build test test-e2e load load-throughput load-spike clean lint fmt
 
-up:
+keys:
+	@[ -f keys/private.pem ] || ./scripts/generate-jwt.sh >/dev/null
+
+up: keys
 	docker compose up --build -d
 
 down:
@@ -8,7 +13,7 @@ down:
 
 COMPOSE_OBS := -f docker-compose.yml -f docker-compose.observability.yml
 
-up-obs:
+up-obs: keys
 	docker compose $(COMPOSE_OBS) up --build -d
 
 down-obs:
@@ -17,7 +22,7 @@ down-obs:
 COMPOSE_CHAOS := $(COMPOSE_OBS) -f docker-compose.chaos.yml
 
 # Stack with the observability overlay and a latency proxy on Wallet -> Ledger, for scripts/chaos.sh.
-up-chaos:
+up-chaos: keys
 	docker compose $(COMPOSE_CHAOS) up --build -d
 
 down-chaos:

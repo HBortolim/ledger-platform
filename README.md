@@ -40,7 +40,7 @@ Only the Wallet Service faces clients. The Ledger and Projection services are in
 You need Docker (with Compose), Make, and `openssl` (the dev JWT script uses it). The Quick Demo also uses `curl`, `jq` and `uuidgen`.
 
 ```sh
-make up        # build and start Postgres, Kafka and the three services
+make up        # create the dev JWT key pair if missing, then build and start Postgres, Kafka and the three services
 ```
 
 `make up` returns before the services are ready. Wait for all three:
