@@ -40,7 +40,7 @@ ADMIN_TOKEN=$(./scripts/generate-jwt.sh 10000000-0000-0000-0000-000000000001 adm
 ```
 
 Pass any user UUID as the first argument and `admin` as the second. The `role: admin`
-claim is required for deposit and withdrawal endpoints (not yet implemented).
+claim is required for deposits, withdrawals and the projection rebuild.
 
 ### Inspect a token
 
@@ -164,32 +164,16 @@ curl -s -X POST http://localhost:8080/wallets \
 
 ---
 
-### Endpoints not yet implemented
+### Every endpoint
 
-The following endpoints return `501 Not Implemented`. Authentication is enforced —
-a missing or invalid token still returns `401` before the stub is reached.
-
-| Method | Path | Status |
-|--------|------|--------|
-| `GET`  | `/wallets/{walletId}/balance` | stub |
-| `POST` | `/wallets/{walletId}/freeze` | stub |
-| `POST` | `/wallets/{walletId}/unfreeze` | stub |
-| `POST` | `/wallets/{walletId}/close` | stub |
-| `POST` | `/transfers` | stub |
-
-Example — confirm auth is enforced on a stub:
+All Wallet Service endpoints are implemented. Their requests, responses and error codes are in the
+[OpenAPI spec](wallet-service.openapi.yaml). Authentication is enforced first: a missing or invalid
+token is `401` before anything else.
 
 ```sh
-# No token → 401 (auth checked before stub)
-curl -s -o /dev/null -w "%{http_code}\n" \
-  http://localhost:8080/wallets/some-id/balance
+# No token -> 401
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/wallets/some-id/balance
 # 401
-
-# Valid token → 501 (auth passed, stub hit)
-curl -s -o /dev/null -w "%{http_code}\n" \
-  -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/wallets/some-id/balance
-# 501
 ```
 
 ---

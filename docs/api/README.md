@@ -34,5 +34,10 @@ docker run --rm -v "$PWD/docs/api:/spec" redocly/cli:2.11.1 lint /spec/wallet-se
 ```
 
 The embedded examples were also checked against their schemas with `kin-openapi`, which loads OpenAPI
-3.1 documents. Comparing the spec with the **running** service's real responses is a separate step
-that is still to be done (Milestone 7, Task 06).
+3.1 documents.
+
+**Drift check.** `make up && make test-e2e` validates every Wallet Service response the e2e suite receives
+against this file (`tests/e2e/spec_drift_test.go`) and fails the run on any mismatch, even when the tests
+pass. It covers the statuses the suite provokes (201s, and the 4xx bodies its tests trigger); statuses it never
+triggers, such as the 503s, are checked by hand only. It needs the running stack, so it stays out of CI, which
+only compiles the suite.
