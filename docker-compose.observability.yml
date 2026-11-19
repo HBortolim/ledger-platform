@@ -8,6 +8,7 @@ services:
     image: prom/prometheus:v2.52.0
     volumes:
       - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
     ports:
       - "9090:9090"
 
@@ -15,6 +16,10 @@ services:
     image: grafana/grafana:10.4.3
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
+      # Local dev stack only: anonymous read-only access, so scripts/screenshot.sh can capture a
+      # dashboard without logging in. Never enable this on a deployed Grafana.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
       - ./infrastructure/observability/grafana:/etc/grafana/provisioning:ro
     ports:

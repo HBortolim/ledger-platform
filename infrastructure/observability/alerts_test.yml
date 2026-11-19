@@ -1,0 +1,120 @@
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # --- OutboxBacklog: above 1000 for over a minute fires; a brief spike does not.
+  - name: outbox backlog sustained
+    interval: 15s
+    input_series:
+      - series: 'ledger_outbox_depth{job="ledger-service"}'
+        values: '0 0 1500x20'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: OutboxBacklog
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: OutboxBacklog
+        exp_alerts:
+          - exp_labels: {severity: page, job: ledger-service}
+            exp_annotations:
+              summary: "Outbox backlog: 1500 unpublished events"
+              description: "Projections lag and GET /balance reports stale until Kafka returns and the worker drains (SPEC 9.5, NFR-AVAIL-5)."
+
+  - name: outbox spike shorter than for-duration does not fire
+    interval: 15s
+    input_series:
+      - series: 'ledger_outbox_depth{job="ledger-service"}'
+        values: '0 0 1500 1500 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OutboxBacklog
+        exp_alerts: []
+
+  # --- ReconciliationDrift: any increase of the counter inside the window.
+  - name: reconciliation drift fires on increase, not on a flat counter
+    interval: 15m
+    input_series:
+      - series: 'reconciliation_drift_total{check="projection"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ReconciliationDrift
+        exp_alerts: []
+      - eval_time: 1h
+        alertname: ReconciliationDrift
+        exp_alerts:
+          - exp_labels: {severity: page, check: projection}
+            exp_annotations:
+              summary: "Reconciliation found drift in check projection"
+              description: "invariant = unbalanced ledger (P0); projection = a wallet's projected balance disagrees with the ledger (rebuild it once the consumer is healthy); money_supply = the system does not net to zero."
+      - eval_time: 2h45m   # the +1 left the 2h window: a persistently flat counter is quiet
+        alertname: ReconciliationDrift
+        exp_alerts: []
+
+  # --- ReconciliationStale
+  # Intervals are 1m, not longer: Prometheus' 5-minute staleness lookback makes a sample invisible
+  # between points spaced further apart, so "for" could never accumulate and a test expecting NO
+  # alert would pass for the wrong reason.
+  - name: stale fires when the last clean pass is over 2h old
+    interval: 1m
+    input_series:
+      - series: 'reconciliation_last_success_timestamp'
+        values: '100x300'             # last clean pass at t=100s, never advanced since (promtool's time() starts at 0)
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: ReconciliationStale
+        exp_alerts: []                # only 1h old
+      - eval_time: 3h
+        alertname: ReconciliationStale
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: "No clean reconciliation pass for over 2 hours"
+              description: "Either the job is not running or it keeps finding drift or erroring (Task 06)."
+
+  - name: stale stays quiet while passes keep succeeding
+    interval: 1m
+    input_series:
+      - series: 'reconciliation_last_success_timestamp'
+        values: '60+60x300'           # advances 60s per minute: always "just now"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ReconciliationStale
+        exp_alerts: []
+
+  - name: stale stays quiet on a fresh stack that has never had a clean pass (gauge is 0)
+    interval: 1m
+    input_series:
+      - series: 'reconciliation_last_success_timestamp'
+        values: '0x300'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ReconciliationStale
+        exp_alerts: []
+
+  # --- ProjectionGapStuck: transient parking is fine, a stuck gap is not.
+  - name: gap parked briefly does not fire
+    interval: 15s
+    input_series:
+      - series: 'projection_pending_entries'
+        values: '0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ProjectionGapStuck
+        exp_alerts: []
+
+  - name: gap parked for over 2 minutes fires
+    interval: 15s
+    input_series:
+      - series: 'projection_pending_entries'
+        values: '0 2x40'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ProjectionGapStuck
+        exp_alerts:
+          - exp_labels: {severity: warn}
+            exp_annotations:
+              summary: "2 projection entries parked behind a gap for over 2 minutes"
+              description: "An entry of some wallet did not arrive. The consumer logs the wallet and missing seq at error level after PENDING_ENTRY_ALERT_AFTER; rebuild the wallet."

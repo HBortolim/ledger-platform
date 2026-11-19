@@ -4,7 +4,7 @@
   "tags": ["ledger-platform", "nfr-obs-4"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": { "from": "now-15m", "to": "now" },
   "panels": [
@@ -170,6 +170,68 @@
           "expr": "ledger_outbox_depth",
           "legendFormat": "unpublished rows"
         }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Ledger posting latency p95 / p99",
+      "description": "NFR-PERF-2: p95 < 50 ms, p99 < 150 ms. Note: ledger_posting_duration_seconds times PostingRepository.Post (the database transaction), not the HTTP request, which NFR-PERF-2 names.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 0}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le) (rate(ledger_posting_duration_seconds_bucket[5m])))", "legendFormat": "p95 posting"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.99, sum by (le) (rate(ledger_posting_duration_seconds_bucket[5m])))", "legendFormat": "p99 posting"}
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Projection pending entries / seq gaps",
+      "description": "Task 08 (SEQ-6/SEQ-9). Pending entries should hover near zero: they rise briefly under normal cross-partition reordering and stay up when an entry was lost. Gaps are entries newly parked.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "projection_pending_entries", "legendFormat": "pending entries"},
+        {"refId": "B", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "increase(projection_seq_gaps_total[5m])", "legendFormat": "new gaps (5m)"}
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Reconciliation passes by result",
+      "description": "SPEC 7.6. One pass per hour by default; error means a check could not run, drift means a check found something.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (result) (increase(reconciliation_runs_total[1h]))", "legendFormat": "{{result}}"}
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Reconciliation drift findings",
+      "description": "True finding counts added by drifting passes (not sample lengths). Persistent drift keeps adding on every pass; alert on the increase, not the absolute value.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 0}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (check) (increase(reconciliation_drift_total[2h]))", "legendFormat": "{{check}}"}
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Time since last clean reconciliation pass",
+      "description": "Grows both when the job has died and when drift persists (drift and error passes do not advance the gauge). Reads as a huge number until the first clean pass.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 0}}, "overrides": []},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "time() - reconciliation_last_success_timestamp", "legendFormat": "since last clean pass"}
       ]
     }
   ]
