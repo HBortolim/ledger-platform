@@ -1,5 +1,7 @@
 # ledger-platform
 
+[![CI](https://github.com/HBortolim/ledger-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/HBortolim/ledger-platform/actions/workflows/ci.yml)
+
 A double-entry wallet platform: users hold BRL wallets, move money between them, and an admin moves money in
 and out. Three services (Java and Go), one Postgres, one Kafka topic.
 
@@ -32,7 +34,8 @@ flowchart LR
     proj --> pg
 ```
 
-Only the Wallet Service faces clients. The Ledger and Projection services are internal. More detail:
+Only the Wallet Service faces clients. The Ledger and Projection services are internal. The
+[Excalidraw board](https://app.excalidraw.com/s/8cyxMT2t7ZA/1bGCGRMQPox) documents 19 flows (transfer, idempotency, rebuild, reconciliation, failure drills, load, observability, CI). More detail:
 [architecture overview](docs/architecture/overview.md), [data flow](docs/architecture/data-flow.md), [ADR index](docs/decisions/README.md).
 
 ## Quick start
@@ -112,7 +115,17 @@ The corrupt, reconcile and rebuild story is in the recorded transcript
 - **Chaos drills:** `make up-chaos && make chaos` kills the Ledger, Kafka, the Projection and the Wallet Service under load and adds 200 ms of Wallet to Ledger latency. [Transcript](docs/results/m7-chaos-transcript.txt) of a full run (the one recorded), all checks passing: 503s with `Retry-After` and no 500s, the `OutboxBacklog` alert firing and then draining, and exactly one ledger transaction per idempotency key after the Wallet Service was killed mid-burst. Money supply stayed at zero. Recording: [`docs/results/m7-chaos.cast`](docs/results/m7-chaos.cast), played with `asciinema play --idle-time-limit 3 docs/results/m7-chaos.cast` (about 17 minutes of real time).
 - **Tracing:** [one transfer across wallet, ledger, outbox publish and projection apply](docs/results/m5-jaeger-end-to-end-trace.png) (Jaeger), and the [Grafana dashboard under a 60 s, 50 RPS run](docs/results/m5-grafana-transfers-overview.png). Local stack, short run; the dashboard is a view of the metrics, not a baseline.
 
-Results will be added here with their environment and a link to the raw output. Nothing is quoted without one.
+### In pictures
+
+One transfer across the wallet, ledger, outbox publish and projection apply:
+
+![Jaeger trace of one transfer across all services](docs/results/m5-jaeger-end-to-end-trace.png)
+
+The Transfers Overview dashboard while the chaos drills kill and restart services under load:
+
+![Grafana during the chaos drills](docs/results/m7-chaos-grafana.png)
+
+Every number above links to its raw output and environment. Nothing is quoted without one.
 
 ## Testing
 

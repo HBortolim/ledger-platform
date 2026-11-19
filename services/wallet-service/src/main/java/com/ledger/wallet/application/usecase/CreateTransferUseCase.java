@@ -149,8 +149,6 @@ public class CreateTransferUseCase {
     }
 
     private TransferOutcome successOutcome(UUID transactionId, Instant postedAt) {
-        // Built as a canonical map (not the TransferResponse record) so this plain ObjectMapper
-        // never has to serialize an Instant -- same reasoning as RequestFingerprint.
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("transferId", transactionId.toString());
         body.put("status", "COMPLETED");
