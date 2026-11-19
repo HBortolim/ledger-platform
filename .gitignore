@@ -43,4 +43,3 @@ keys/private.pem
 # VSCode
 .vscode/
 docs/milestones/
-docs/decisions/

@@ -83,3 +83,23 @@ Keep one shared migration set applied by a single tool/owner before any service 
 
 - ~~Should wallet-service and projection-service get their own restricted app roles (mirroring `ledger_app`)?~~ Resolved: `wallet_app` (`V2__wallet_grants.sql`) and `projection_app` (`0002_projection_grants.up.sql`) now exist. wallet-service required an extra step ledger-service didn't: since its Flyway runs in-process rather than via a separate CLI container, giving its runtime a restricted role meant splitting `spring.flyway.url/user/password` (owner) from `spring.datasource.*` (`wallet_app`) — otherwise the app's own primary DataSource would try to authenticate as a role that doesn't exist until that same Flyway run creates it. Verified empirically (no bootstrap deadlock) via a full fresh-volume `docker compose up` and the IT suite.
 - ~~Where does the migration step run for ledger-service/projection-service in compose?~~ Resolved: dedicated one-shot `migrate/migrate` CLI services (`ledger-migrate`, `projection-migrate`) in `docker-compose.yml`, gated via `depends_on: condition: service_completed_successfully`.
+
+### Amendment (2026-11-14, milestone-7 task 05): the migration sets as they stand
+
+- **File → owner mapping is out of date.** Current sets: Ledger `0001` schema, `0002` seed, `0003` grants,
+  `0004_wallet_read_grants`, `0005_zero_system_account_seed`, `0006_entry_sequence`. Projection `0001` schema,
+  `0002_projection_grants`, `0003_wallet_read_grants`, `0004_ledger_read_grants`, `0005_ledger_app_read_grants`,
+  `0006_entry_sequence`. Wallet Flyway `V1`–`V3` (`V3` adds idempotency status).
+- **History tables are not schema-scoped.** golang-migrate is run with `x-migrations-table`, giving
+  `ledger_schema_migrations` and `projection_schema_migrations` in the default schema (the three histories
+  still never collide), not a `schema_migrations` inside `ledger_db`/`projection_db`.
+- **Cross-service read grants follow an ownership rule:** the service that owns an object grants it to the
+  other service's role, so a migration only ever grants on a schema its own set created (Ledger `0004` grants
+  `wallet_app` `SELECT` on `ledger_entries`; Projection `0003` grants `wallet_app` on `wallet_balances`;
+  Projection `0005` grants `ledger_app` on `wallet_balances` for reconciliation). Each grant migration creates
+  its grantee role `IF NOT EXISTS`, so it applies regardless of whether the grantee's own migrations ran.
+- **One exception, and the ordering it forces:** Projection `0004_ledger_read_grants` grants `projection_app`
+  `SELECT` on `ledger_db.ledger_entries` (for the rebuild), i.e. a grant on another service's schema. It works
+  only because `projection-migrate` `depends_on` `ledger-migrate` in `docker-compose.yml`; moving it to the
+  Ledger set is optional cleanup (M6 Task 06 notes). The reverse direction cannot also depend on ordering
+  (it would be a cycle), which is why `0005` lives on the Projection side.

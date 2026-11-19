@@ -67,3 +67,16 @@ a normal wallet's very first transfer would otherwise slip through the same heur
   (the exemption is real and lands in M3), though the helper's actual behavior (seeding balances
   directly via SQL rather than through `PostingRepository.Post`) remains a valid, independent
   design choice for decoupling fixture setup from the code path under test.
+
+### Amendment (2026-11-14, milestone-7 task 05): the seed is no longer 1000; withdrawals exist
+
+- Ledger migration `0005_zero_system_account_seed` (M6 Task 06) zeroes the `0002` seed of `1000`, guarded by
+  "only if the system account has no ledger entries", so on a fresh or untouched database the account starts at
+  `0.00`. The seed was not merely vestigial: with it, NFR-CONS-5's "the system holds zero net" was literally
+  false by 1000, and the reconciliation job's money-supply check would have failed out of the box. The
+  exemption itself is unchanged and still matches the single configured `SYSTEM_ACCOUNT_ID`. (A database that
+  already had system-account history keeps its cached balance; `make down && make up` converges.)
+- "Nothing ever credits it back in v1 (withdrawals are M6 scope)": withdrawals now exist (`POST /withdrawals`,
+  ADR-0015), credit the system account, and are covered by the same invariant.
+- The system account is also exempt from the daily cap (ADR-0011 amendment) and is checked, not excluded, by
+  the reconciliation job's projection check, because it has a projection row like any wallet.

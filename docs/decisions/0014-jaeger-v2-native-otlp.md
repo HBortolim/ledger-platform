@@ -35,3 +35,17 @@ This explicitly **supersedes ADR-0012's Decision and its Alternative #1** (which
 - This is not a one-way door. If a genuine need for multi-backend fan-out or a real processing pipeline (sampling, filtering, PII scrubbing) arises later, a collector can be reintroduced in front of Jaeger without touching application code — the services already speak generic OTLP and know nothing about Jaeger specifically.
 - The original discovery documented in ADR-0012 (the OTel Collector's built-in `jaeger` exporter component was deprecated in 2023 and removed from the Collector distribution) is unaffected by this change and remains accurate history — see ADR-0012 for that troubleshooting record.
 - Fail-soft behavior is unchanged: with no `OTEL_EXPORTER_OTLP_ENDPOINT`/`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` configured (e.g. plain `make up`), tracing stays disabled and every service runs normally — this was already proven under the collector-based pipeline and generalizes unchanged to Jaeger's absence.
+
+### Amendment (2026-11-14, milestone-7 task 05): the "tracing stays disabled" claim, and a date typo
+
+- **The Consequences' last bullet is not what `docker-compose.yml` does.** It says that with no OTLP endpoint
+  configured "(e.g. plain `make up`) tracing stays disabled". The base compose file sets
+  `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317` on ledger-service and projection-service and the Spring
+  equivalent on wallet-service unconditionally, while the `jaeger` service only exists in the observability
+  overlay. So on a plain `make up` tracing is *enabled* and exports to a host that does not resolve; the Go
+  services log `otel sdk error … name resolver error` (M6 Task 07 observed the same message for ~3 minutes after
+  Jaeger started late). Spans are dropped and requests are unaffected, i.e. it still fails soft, but it is noisy
+  rather than silent. The code-level behaviour (no endpoint env var → tracing disabled) is as described; only the
+  compose default differs. Options if this matters: move the three endpoints into the overlay, or document it.
+  Not changed here.
+- Alternative 2 says Jaeger v1 is end-of-life "as of 2026-12-31"; the Context (correctly) says 2025-12-31.
