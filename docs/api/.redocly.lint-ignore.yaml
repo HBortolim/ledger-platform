@@ -1,0 +1,12 @@
+# Deliberate exceptions to Redocly's recommended rules (regenerate with `--generate-ignore-file`
+# after editing the spec; every entry below needs a reason here).
+wallet-service.openapi.yaml:
+  # The only deployment that exists today is the local compose stack. Add a cloud server here
+  # (and drop this entry) when one does.
+  no-server-example.com:
+    - '#/servers/0/url'
+  # The health probes have no failure response: /health/live and /health/ready answer 200 or the
+  # process is not serving at all, and neither requires authentication.
+  operation-4xx-response:
+    - '#/paths/~1health~1live/get/responses'
+    - '#/paths/~1health~1ready/get/responses'

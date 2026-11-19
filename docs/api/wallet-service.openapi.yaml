@@ -1,0 +1,859 @@
+openapi: 3.1.0
+info:
+  title: Ledger Platform — Wallet Service API
+  version: 1.0.0
+  summary: The public API of the platform. Clients only ever talk to the Wallet Service.
+  description: |
+    Wallet lifecycle, balances, transfers, and admin-only external money movements
+    (deposits and withdrawals) and projection rebuild.
+
+    This file is the **contract** for the Wallet Service's public API. It was written from the
+    code (controllers, `GlobalExceptionHandler`, `SecurityConfig`) and the existing integration
+    and end-to-end tests. The Ledger and Projection services have internal admin routes that are
+    deliberately not described here (see `docs/architecture/`).
+
+    ## Authentication
+
+    Every endpoint except the health probes needs `Authorization: Bearer <JWT>`. Tokens are
+    RS256-signed; the service verifies them with a public key and reads two claims:
+
+    - `sub` — the caller's user id, **a UUID** (anything else is a 401);
+    - `role` — compared case-insensitively. `admin` is required for `/deposits`, `/withdrawals`
+      and `/admin/**`. Any other value, or no `role` claim, is an ordinary user.
+
+    For local development, `scripts/generate-jwt.sh <user-id> [role]` mints a token.
+
+    ## Idempotency
+
+    `POST /transfers`, `/deposits` and `/withdrawals` accept an optional `Idempotency-Key`
+    header. Keys are scoped per caller. Behaviour:
+
+    - **Replay** (same key, same body): the stored status and body come back byte for byte,
+      including stored `422` rejections; no second ledger posting is made.
+    - **Mismatch** (same key, different body): `422` with code `IDEMPOTENCY_KEY_MISMATCH`.
+    - **In flight** (the first request has not completed): the service waits up to 5 seconds,
+      then checks the ledger directly; if nothing was posted it answers `409` with code
+      `IN_PROGRESS` and the client should retry.
+    - Records expire after 24 hours.
+    - Without the header the request still works, but duplicate protection is the client's job.
+
+    ## Errors
+
+    The API produces **four different error shapes**, and a client has to handle all of them:
+
+    1. `{"code", "message"}` — single domain errors (`409`, `503`).
+    2. `{"errors": [{"code", "message"}, …]}` — validation and ledger rejections (`422`).
+    3. **An empty body** — ownership failures (`403` on a wallet that is not yours *or* does not
+       exist, `404` on `GET /wallets/{id}`, `404` on rebuild of an unknown wallet) and `400`
+       from bean-validation failures.
+    4. Spring Boot's default error object `{"timestamp", "status", "error", "path"}` — `401`,
+       `403` for a missing admin role, and `400` for malformed JSON or a malformed UUID in a path.
+
+    `503` responses always carry `Retry-After: 2`.
+
+    ## Money
+
+    Amounts are sent as strings with **exactly two decimals** and a value greater than zero
+    (`"100.00"`). Anything else is `422 INVALID_AMOUNT`. Balances come back as JSON numbers
+    (`500.00`) — read them with a decimal type, not a binary float, when exactness matters.
+  license:
+    name: UNLICENSED
+    identifier: UNLICENSED
+servers:
+  - url: http://localhost:8080
+    description: Local stack (`make up`)
+security:
+  - bearerAuth: []
+tags:
+  - name: Wallets
+    description: Create and inspect wallets, and move them through their lifecycle.
+  - name: Transfers
+    description: Move money between two wallets.
+  - name: External movements
+    description: Admin-only deposits into, and withdrawals from, the platform.
+  - name: Admin
+    description: Admin-only operational endpoints.
+  - name: Health
+    description: Liveness and readiness probes (no authentication).
+paths:
+  /wallets:
+    post:
+      tags: [Wallets]
+      operationId: createWallet
+      summary: Create a wallet
+      description: |
+        Creates an `ACTIVE` wallet owned by the caller (the token's `sub`). A user may own any
+        number of wallets. Only `BRL` is supported.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWalletRequest'
+            example:
+              currency: BRL
+      responses:
+        '201':
+          description: The wallet was created.
+          headers:
+            Location:
+              description: Path of the new wallet.
+              schema:
+                type: string
+                examples: ['/wallets/6f9619ff-8b86-d011-b42d-00cf4fc964ff']
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+              example:
+                walletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                currency: BRL
+                status: ACTIVE
+                createdAt: '2026-11-10T21:43:45.795745Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: The currency is not supported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrors'
+              example:
+                errors:
+                  - code: UNSUPPORTED_CURRENCY
+                    message: Only BRL is supported
+  /wallets/{walletId}:
+    get:
+      tags: [Wallets]
+      operationId: getWallet
+      summary: Get a wallet
+      description: |
+        Returns a wallet the caller owns. A wallet that belongs to someone else is
+        indistinguishable from one that does not exist: both are `404` with an empty body.
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The wallet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+              example:
+                walletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                currency: BRL
+                status: FROZEN
+                createdAt: '2026-11-10T21:43:45.795745Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFoundEmpty'
+  /wallets/{walletId}/balance:
+    get:
+      tags: [Wallets]
+      operationId: getBalance
+      summary: Get a wallet's balance
+      description: |
+        The balance comes from the **projection**, which trails the ledger by a short and
+        bounded delay (target p99 under 5 seconds). `stale` is `true` when the ledger holds an
+        entry for this wallet that is newer than the projection's last applied entry and
+        more than 5 seconds old — i.e. the projection is visibly behind.
+
+        A wallet that has never had a transaction has no projection row yet and reads as
+        `0.00`, with `asOf` equal to the wallet's creation time.
+
+        A wallet that is not yours, or does not exist, is `403` with an empty body. If the
+        database is unavailable the response is a plain `500`: this endpoint has no `503` path.
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+              example:
+                walletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                balance: 500.00
+                currency: BRL
+                asOf: '2026-11-10T21:44:57.570555Z'
+                stale: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnership'
+  /wallets/{walletId}/freeze:
+    post:
+      tags: [Wallets]
+      operationId: freezeWallet
+      summary: Freeze a wallet
+      description: |
+        `ACTIVE` → `FROZEN`. Idempotent: freezing a frozen wallet is `200` and writes nothing.
+        A frozen wallet is refused as both source and destination of a transfer. A `CLOSED`
+        wallet cannot be frozen. Every real transition writes an audit row.
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The wallet, in its new (or unchanged) state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnership'
+        '409':
+          $ref: '#/components/responses/WalletConflict'
+  /wallets/{walletId}/unfreeze:
+    post:
+      tags: [Wallets]
+      operationId: unfreezeWallet
+      summary: Unfreeze a wallet
+      description: |
+        `FROZEN` → `ACTIVE`. Idempotent: unfreezing an active wallet is `200` and writes nothing.
+        A `CLOSED` wallet cannot be reopened (`409 WALLET_CLOSED`).
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The wallet, in its new (or unchanged) state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnership'
+        '409':
+          $ref: '#/components/responses/WalletConflict'
+  /wallets/{walletId}/close:
+    post:
+      tags: [Wallets]
+      operationId: closeWallet
+      summary: Close a wallet
+      description: |
+        Moves the wallet to `CLOSED`, which is final. The ledger-derived balance must be exactly
+        zero, otherwise `409 NONZERO_BALANCE` (drain it first with a withdrawal). Closing an
+        already closed wallet is `200` and writes nothing. A closed wallet's ledger history is
+        kept and stays queryable.
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The wallet, in its new (or unchanged) state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+              example:
+                walletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                currency: BRL
+                status: CLOSED
+                createdAt: '2026-11-10T21:43:45.795745Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnership'
+        '409':
+          $ref: '#/components/responses/WalletConflict'
+  /transfers:
+    post:
+      tags: [Transfers]
+      operationId: createTransfer
+      summary: Transfer money between two wallets
+      description: |
+        The caller must **own the source** wallet; the destination can be any `ACTIVE` wallet.
+        Both wallets must be `ACTIVE` and in the same currency, and the source must differ from
+        the destination.
+
+        A source wallet that is not yours or does not exist is `403` with an empty body — the
+        same answer for both, so wallet ids cannot be probed. An unknown or inactive
+        *destination* is `422 WALLET_NOT_ACTIVE`.
+
+        The ledger enforces sufficient funds and a per-wallet daily outflow cap (100,000.00 by
+        default); both come back as `422`.
+
+        If the Ledger Service is unreachable the answer is `503` and the idempotency key is
+        released, so the client can retry the same request.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+            example:
+              sourceWalletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+              destinationWalletId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+              amount: '100.00'
+              description: rent
+      responses:
+        '201':
+          description: The transfer was posted to the ledger. (Also returned on an idempotent replay.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+              example:
+                transferId: 8f1a2d3e-aaaa-5bbb-8ccc-0123456789ab
+                status: COMPLETED
+                postedAt: '2026-11-10T21:43:45.795745Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnership'
+        '409':
+          $ref: '#/components/responses/InProgress'
+        '422':
+          description: |
+            The request was understood and refused. `errors[0].code` is one of:
+            `INVALID_AMOUNT`, `SELF_TRANSFER`, `WALLET_NOT_ACTIVE`, `CURRENCY_MISMATCH`,
+            `IDEMPOTENCY_KEY_MISMATCH`, `INSUFFICIENT_FUNDS`, `DAILY_LIMIT_EXCEEDED`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrors'
+              examples:
+                insufficientFunds:
+                  summary: The source cannot cover the amount
+                  value:
+                    errors:
+                      - code: INSUFFICIENT_FUNDS
+                        message: insufficient funds for account 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                selfTransfer:
+                  summary: Source and destination are the same wallet
+                  value:
+                    errors:
+                      - code: SELF_TRANSFER
+                        message: source and destination wallets must differ
+                walletNotActive:
+                  summary: The source or destination is frozen, closed or unknown
+                  value:
+                    errors:
+                      - code: WALLET_NOT_ACTIVE
+                        message: destination wallet is not ACTIVE
+                invalidAmount:
+                  summary: The amount is not greater than zero with exactly two decimals
+                  value:
+                    errors:
+                      - code: INVALID_AMOUNT
+                        message: amount must be greater than 0 with exactly 2 decimal places
+        '503':
+          $ref: '#/components/responses/LedgerUnavailable'
+  /deposits:
+    post:
+      tags: [External movements]
+      operationId: createDeposit
+      summary: Deposit money into a wallet (admin only)
+      description: |
+        Posts one DEBIT on the platform's system funding account and one CREDIT on the destination
+        wallet. The system account is allowed to go negative and is exempt from the daily cap.
+        The destination can be any `ACTIVE` BRL wallet, not only the admin's own; a wallet that
+        does not exist is `422 WALLET_NOT_ACTIVE` (not 403/404).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+            example:
+              destinationWalletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+              amount: '500.00'
+      responses:
+        '201':
+          description: The deposit was posted. (Also returned on an idempotent replay.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementResponse'
+              example:
+                transactionId: 27e78ef2-903c-53ef-a60c-24682215dfe0
+                status: COMPLETED
+                postedAt: '2026-11-10T21:43:45.795745Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '409':
+          $ref: '#/components/responses/InProgress'
+        '422':
+          $ref: '#/components/responses/MovementRejected'
+        '503':
+          $ref: '#/components/responses/LedgerUnavailable'
+  /withdrawals:
+    post:
+      tags: [External movements]
+      operationId: createWithdrawal
+      summary: Withdraw money from a wallet (admin only)
+      description: |
+        The mirror of a deposit: DEBIT on the wallet, CREDIT on the system funding account. The
+        wallet's balance and daily cap apply, so the ledger can answer `INSUFFICIENT_FUNDS` or
+        `DAILY_LIMIT_EXCEEDED`. The source can be any `ACTIVE` BRL wallet, not only the admin's own.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+            example:
+              sourceWalletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+              amount: '80.00'
+      responses:
+        '201':
+          description: The withdrawal was posted. (Also returned on an idempotent replay.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementResponse'
+              example:
+                transactionId: 5b2c1d9e-1111-5222-8333-abcdefabcdef
+                status: COMPLETED
+                postedAt: '2026-11-10T21:50:00.123456Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '409':
+          $ref: '#/components/responses/InProgress'
+        '422':
+          $ref: '#/components/responses/MovementRejected'
+        '503':
+          $ref: '#/components/responses/LedgerUnavailable'
+  /admin/projections/{walletId}/rebuild:
+    post:
+      tags: [Admin]
+      operationId: rebuildProjection
+      summary: Rebuild a wallet's projected balance from the ledger (admin only)
+      description: |
+        Discards the wallet's cached balance and recomputes it from the authoritative ledger. Safe
+        to run while the consumer is live, and exact even if the consumer is behind. Use it when
+        reconciliation reports drift for a wallet. Writes a `PROJECTION_REBUILD` audit row with
+        the admin's id.
+
+        A wallet that does not exist is `404` with an empty body. If the Projection Service is
+        unreachable or answers anything but success, the response is `503` with
+        `PROJECTION_UNAVAILABLE`, never `500`.
+      parameters:
+        - $ref: '#/components/parameters/WalletId'
+      responses:
+        '200':
+          description: The wallet was rebuilt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RebuildResult'
+              example:
+                walletId: 6f9619ff-8b86-d011-b42d-00cf4fc964ff
+                balance: 500.00
+                entriesApplied: 1
+                rebuiltAt: '2026-11-10T21:44:57.248559Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFoundEmpty'
+        '503':
+          description: The Projection Service is unreachable or failed.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: PROJECTION_UNAVAILABLE
+                message: null
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Liveness probe
+      description: The process is up. No authentication.
+      security: []
+      responses:
+        '200':
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: UP
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Readiness probe
+      description: |
+        Currently reports `UP` whenever the process is serving; it does **not** check the database
+        yet (there is a TODO in the controller), so it never returns `503`. No authentication.
+      security: []
+      responses:
+        '200':
+          description: The process is serving requests.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: UP
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        RS256 JWT with a UUID `sub` claim and a `role` claim (`admin` for the admin endpoints).
+        `scripts/generate-jwt.sh <user-id> [role]` mints one for local use.
+  parameters:
+    WalletId:
+      name: walletId
+      in: path
+      required: true
+      description: The wallet's id. A value that is not a UUID is `400`.
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Any string up to 128 characters, unique per intended operation (a UUID is a good choice).
+        Scoped to the caller. See "Idempotency" above.
+      schema:
+        type: string
+        maxLength: 128
+  headers:
+    RetryAfter:
+      description: Seconds to wait before retrying. Always `2`.
+      schema:
+        type: string
+        examples: ['2']
+  responses:
+    BadRequest:
+      description: |
+        The request could not be processed: malformed JSON, a malformed UUID in the path, or a
+        missing/blank field. Bean-validation failures on other fields than `amount` have an
+        **empty body**; malformed JSON and bad path UUIDs return Spring Boot's default error object.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FrameworkError'
+          example:
+            timestamp: '2026-11-10T21:42:56.917Z'
+            status: 400
+            error: Bad Request
+            path: /wallets//balance
+    Unauthorized:
+      description: |
+        The `Authorization` header is missing, is not a Bearer token, or the token is invalid or
+        expired (also: its `sub` is not a UUID).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FrameworkError'
+          example:
+            timestamp: '2026-11-10T21:42:56.917Z'
+            status: 401
+            error: Unauthorized
+            path: /wallets
+    ForbiddenRole:
+      description: The token is valid but its role is not `admin`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FrameworkError'
+          example:
+            timestamp: '2026-11-10T21:42:56.917Z'
+            status: 403
+            error: Forbidden
+            path: /deposits
+    ForbiddenOwnership:
+      description: |
+        The wallet is not yours, or does not exist — the same empty answer for both, so wallet ids
+        cannot be probed.
+    NotFoundEmpty:
+      description: |
+        There is no such wallet (for `GET /wallets/{id}`: no such wallet *owned by you*). Empty body.
+    WalletConflict:
+      description: |
+        The transition is not allowed. `code` is `WALLET_CLOSED` (a closed wallet cannot change
+        status) or `NONZERO_BALANCE` (close needs a zero balance).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            walletClosed:
+              value:
+                code: WALLET_CLOSED
+                message: wallet is closed and cannot change status
+            nonzeroBalance:
+              value:
+                code: NONZERO_BALANCE
+                message: wallet balance must be zero to close
+    InProgress:
+      description: |
+        The first request with this `Idempotency-Key` has not completed and the ledger holds no
+        matching transaction. Retry the same request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: IN_PROGRESS
+            message: the original request has not completed yet
+    MovementRejected:
+      description: |
+        Refused. `errors[0].code` is one of: `INVALID_AMOUNT`, `WALLET_NOT_ACTIVE` (unknown, frozen
+        or closed wallet), `UNSUPPORTED_CURRENCY` (not BRL), `IDEMPOTENCY_KEY_MISMATCH`,
+        `INSUFFICIENT_FUNDS` and `DAILY_LIMIT_EXCEEDED` (withdrawals).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrors'
+          example:
+            errors:
+              - code: WALLET_NOT_ACTIVE
+                message: wallet is not ACTIVE
+    LedgerUnavailable:
+      description: The Ledger Service is unreachable or answered unexpectedly. Retry with the same `Idempotency-Key`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: LEDGER_UNAVAILABLE
+            message: null
+  schemas:
+    CreateWalletRequest:
+      type: object
+      required: [currency]
+      properties:
+        currency:
+          type: string
+          description: Only `BRL` is supported. Blank or missing is a `400`; any other value is `422 UNSUPPORTED_CURRENCY`.
+          examples: [BRL]
+    Wallet:
+      type: object
+      required: [walletId, currency, status, createdAt]
+      properties:
+        walletId:
+          type: string
+          format: uuid
+        currency:
+          type: string
+          examples: [BRL]
+        status:
+          $ref: '#/components/schemas/WalletStatus'
+        createdAt:
+          type: string
+          format: date-time
+    WalletStatus:
+      type: string
+      description: '`CLOSED` is final.'
+      enum: [ACTIVE, FROZEN, CLOSED]
+    Balance:
+      type: object
+      required: [walletId, balance, currency, asOf, stale]
+      properties:
+        walletId:
+          type: string
+          format: uuid
+        balance:
+          type: number
+          description: The projected balance. Always has two decimals in the response (e.g. `500.00`).
+        currency:
+          type: string
+          examples: [BRL]
+        asOf:
+          type: string
+          format: date-time
+          description: When the projection last applied an entry for this wallet (the wallet's creation time if it never has).
+        stale:
+          type: boolean
+          description: The projection is visibly behind the ledger. See the operation's description.
+    Amount:
+      type: string
+      pattern: '^[0-9]{1,17}\.[0-9]{2}$'
+      description: |
+        Exactly two decimals and greater than zero (`"0.01"` is the smallest). The pattern cannot
+        express "greater than zero"; `"0.00"` is rejected with `422 INVALID_AMOUNT`.
+      examples: ['100.00']
+    TransferRequest:
+      type: object
+      required: [sourceWalletId, destinationWalletId, amount]
+      properties:
+        sourceWalletId:
+          type: string
+          format: uuid
+          description: Must be owned by the caller.
+        destinationWalletId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Amount'
+        description:
+          type: string
+          description: Optional free text.
+    TransferResponse:
+      type: object
+      required: [transferId, status, postedAt]
+      properties:
+        transferId:
+          type: string
+          format: uuid
+          description: The ledger transaction id. Derived deterministically from the caller and the `Idempotency-Key` when one is sent.
+        status:
+          type: string
+          enum: [COMPLETED]
+        postedAt:
+          type: string
+          format: date-time
+    DepositRequest:
+      type: object
+      required: [destinationWalletId, amount]
+      properties:
+        destinationWalletId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Amount'
+        description:
+          type: string
+          description: Optional free text.
+    WithdrawalRequest:
+      type: object
+      required: [sourceWalletId, amount]
+      properties:
+        sourceWalletId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Amount'
+        description:
+          type: string
+          description: Optional free text.
+    MovementResponse:
+      type: object
+      required: [transactionId, status, postedAt]
+      description: Note the field is `transactionId` here, where a transfer's response says `transferId`.
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [COMPLETED]
+        postedAt:
+          type: string
+          format: date-time
+    RebuildResult:
+      type: object
+      required: [walletId, balance, entriesApplied, rebuiltAt]
+      properties:
+        walletId:
+          type: string
+          format: uuid
+        balance:
+          type: number
+          description: The recomputed balance (two decimals, e.g. `500.00`).
+        entriesApplied:
+          type: integer
+          description: Ledger entries replayed (plus any parked entries the rebuild drained).
+        rebuiltAt:
+          type: string
+          format: date-time
+    ErrorCode:
+      type: string
+      description: A stable machine-readable code. Clients should tolerate codes not listed here.
+      enum:
+        - INVALID_AMOUNT
+        - UNSUPPORTED_CURRENCY
+        - SELF_TRANSFER
+        - WALLET_NOT_ACTIVE
+        - CURRENCY_MISMATCH
+        - INSUFFICIENT_FUNDS
+        - DAILY_LIMIT_EXCEEDED
+        - IDEMPOTENCY_KEY_MISMATCH
+        - IN_PROGRESS
+        - LEDGER_UNAVAILABLE
+        - PROJECTION_UNAVAILABLE
+        - WALLET_CLOSED
+        - NONZERO_BALANCE
+    Error:
+      type: object
+      required: [code]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: [string, 'null']
+          description: Human-readable detail; `null` on `503`s. Not for programmatic use.
+    ValidationErrors:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Error'
+    FrameworkError:
+      type: object
+      description: |
+        Spring Boot's default error object, produced for errors raised before a controller runs
+        (authentication, authorization, malformed requests). It has no `code`.
+      required: [timestamp, status, error, path]
+      properties:
+        timestamp:
+          type: string
+        status:
+          type: integer
+        error:
+          type: string
+        path:
+          type: string
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [UP]
