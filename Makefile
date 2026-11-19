@@ -1,4 +1,4 @@
-.PHONY: up down up-obs down-obs build test test-e2e load clean lint fmt
+.PHONY: up down up-obs down-obs build test test-e2e load load-throughput load-spike clean lint fmt
 
 up:
 	docker compose up --build -d
@@ -23,7 +23,6 @@ test:
 	$(MAKE) -C services/wallet-service test
 	cd services/ledger-service && go test ./...
 	cd services/projection-service && go test ./...
-
 test-e2e:
 	cd tests/e2e && go test -tags=e2e ./...
 
@@ -38,8 +37,16 @@ fmt:
 	cd services/ledger-service && gofmt -w .
 	cd services/projection-service && gofmt -w .
 
+# Load tests (SPEC.md §10.6, NFR-PERF-4). Need a running stack (`make up`); no k6 install, it runs in Docker.
+# Set BASE_URL (and LEDGER_URL, USER_TOKEN, ADMIN_TOKEN) to target a deployment instead of the local stack.
 load:
-	k6 run infrastructure/load/transfer_steady.js
+	scripts/load.sh steady
+
+load-throughput:
+	scripts/load.sh throughput
+
+load-spike:
+	scripts/load.sh spike
 
 clean:
 	docker compose down -v --rmi local

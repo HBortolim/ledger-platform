@@ -218,7 +218,7 @@ Each NFR has a metric, a target, and how it's measured. "Should be fast" is not 
 | NFR-PERF-1 | Wallet Service `POST /transfers` end-to-end latency | p50 < 80 ms, p95 < 200 ms, p99 < 500 ms | Prometheus histogram, k6 load test at 50 RPS |
 | NFR-PERF-2 | Ledger Service `POST /ledger/postings` latency | p95 < 50 ms, p99 < 150 ms | Prometheus histogram |
 | NFR-PERF-3 | Projection lag (time from ledger commit to projection update) | p95 < 2 s, p99 < 5 s | Custom metric `projection_lag_seconds` |
-| NFR-PERF-4 | Sustained transfer throughput on a single laptop (8 CPU, 16 GB) | ≥ 100 TPS for 5 minutes with error rate < 0.1% | k6 load test profile in `tests/load/` |
+| NFR-PERF-4 | Sustained transfer throughput (environment recorded with the results) | ≥ 100 TPS for 5 minutes with error rate < 0.1% | k6 load test profile in `infrastructure/load/` |
 
 #### Consistency
 
@@ -902,10 +902,11 @@ Run during a recorded demo, not in CI:
 
 ### 10.6 Load tests
 
-k6 scripts in `tests/load/`:
+k6 scripts in `infrastructure/load/`, run from Docker with `make load`, `make load-throughput` and `make load-spike`. Each spreads requests over a pool of funded wallets, sends an exact request rate (arrival-rate executors), and ends with a reconciliation check whose failures are counted as invariant violations:
 
-- `transfer_steady.js` — 50 RPS for 5 minutes. Asserts p95 latency, zero invariant violations.
-- `transfer_spike.js` — ramp from 10 to 200 RPS over 30s. Asserts the system either holds SLOs or fails fast (no requests >5s).
+- `transfer_steady.js` — 50 RPS for 5 minutes (`constant-arrival-rate`). Asserts p95 < 200 ms, p99 < 500 ms, error rate < 0.1%, zero dropped iterations and zero invariant violations.
+- `transfer_throughput.js` — 100 RPS for 5 minutes (NFR-PERF-4). Asserts error rate < 0.1%, zero dropped iterations and zero invariant violations. Latency is reported, not gated.
+- `transfer_spike.js` — ramp from 10 to 200 RPS over 30s, hold 1 minute, ramp down (`ramping-arrival-rate`). Asserts the system fails fast: no request takes more than 5 s (`max`), and zero invariant violations.
 
 ---
 
