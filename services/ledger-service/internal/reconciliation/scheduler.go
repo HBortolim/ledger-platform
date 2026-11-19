@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
 )
 
 type runner interface {

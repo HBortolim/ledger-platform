@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
-	"github.com/ledger-platform/ledger-service/internal/service"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/service"
 )
 
 // overlapProbe wraps the real repository and records how many passes are inside their

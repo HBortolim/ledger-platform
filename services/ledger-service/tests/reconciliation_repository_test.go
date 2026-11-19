@@ -13,8 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
 )
 
 // seedProjectionSchema creates projection_db.wallet_balances and emulates the grant that

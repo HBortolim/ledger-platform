@@ -10,15 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/handler"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/logging"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/observability"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/ledger-platform/projection-service/internal/config"
-	"github.com/ledger-platform/projection-service/internal/consumer"
-	"github.com/ledger-platform/projection-service/internal/handler"
-	"github.com/ledger-platform/projection-service/internal/logging"
-	"github.com/ledger-platform/projection-service/internal/observability"
-	"github.com/ledger-platform/projection-service/internal/repository"
-	"github.com/ledger-platform/projection-service/internal/service"
 )
 
 func main() {

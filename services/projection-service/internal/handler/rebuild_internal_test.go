@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
 )
 
 func init() { gin.SetMode(gin.TestMode) }

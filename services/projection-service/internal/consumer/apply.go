@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/ledger-platform/projection-service/internal/domain"
-	"github.com/ledger-platform/projection-service/internal/sequence"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/sequence"
 )
 
 // upsertOffset records the last-processed offset for a consumer group. The

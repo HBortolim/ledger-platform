@@ -14,9 +14,9 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/ledger-platform/projection-service/internal/config"
-	"github.com/ledger-platform/projection-service/internal/consumer"
-	"github.com/ledger-platform/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
 )
 
 // TestConsumer_AppliesLedgerPosted_ToWalletBalances produces a real

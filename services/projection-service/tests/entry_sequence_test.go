@@ -14,11 +14,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/config"
-	"github.com/ledger-platform/projection-service/internal/consumer"
-	"github.com/ledger-platform/projection-service/internal/metrics"
-	"github.com/ledger-platform/projection-service/internal/repository"
-	"github.com/ledger-platform/projection-service/internal/sequence"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/sequence"
 )
 
 // seqEnv is one Postgres, one Kafka topic (one partition, so offsets count events) and ONE

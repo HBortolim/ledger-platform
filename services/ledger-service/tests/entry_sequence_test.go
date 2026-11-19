@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
 )
 
 func entrySeqs(t *testing.T, pool *pgxpool.Pool, account uuid.UUID) []int64 {

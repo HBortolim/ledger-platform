@@ -13,8 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/domain"
-	"github.com/ledger-platform/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
 )
 
 // ctxKey is unexported so no other package can collide with the test's context value.

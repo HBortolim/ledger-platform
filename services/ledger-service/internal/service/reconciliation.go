@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
-	"github.com/ledger-platform/ledger-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/metrics"
 )
 
 // ReconciliationRepository is what the service needs from storage.

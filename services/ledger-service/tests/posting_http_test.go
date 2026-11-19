@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/ledger-platform/ledger-service/internal/handler"
-	"github.com/ledger-platform/ledger-service/internal/repository"
-	"github.com/ledger-platform/ledger-service/internal/service"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/handler"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/service"
 )
 
 // TestPostingHTTP exercises POST /ledger/postings and GET

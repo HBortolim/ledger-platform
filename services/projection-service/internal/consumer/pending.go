@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ledger-platform/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
 )
 
 // maxStuckWalletsLogged bounds the error lines one report can emit, so a mass loss does not

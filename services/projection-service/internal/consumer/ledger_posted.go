@@ -15,8 +15,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/ledger-platform/projection-service/internal/config"
-	"github.com/ledger-platform/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
 )
 
 const ledgerPostedTopic = "ledger.posted.v1"
@@ -25,7 +25,7 @@ const ledgerPostedTopic = "ledger.posted.v1"
 // outage is not a hot loop of failing applies and error logs.
 const applyRetryBackoff = time.Second
 
-var tracer = otel.Tracer("github.com/ledger-platform/projection-service/internal/consumer")
+var tracer = otel.Tracer("github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer")
 
 // recordCarrier adapts a consumed record's headers to OTel's TextMapCarrier.
 // Extract-only; Set is a no-op.

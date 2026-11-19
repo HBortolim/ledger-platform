@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/ledger-platform/ledger-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/metrics"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 	produceTimeout    = 5 * time.Second
 )
 
-var tracer = otel.Tracer("github.com/ledger-platform/ledger-service/internal/outbox")
+var tracer = otel.Tracer("github.com/HBortolim/ledger-platform/services/ledger-service/internal/outbox")
 
 // Worker drains ledger_db.outbox rows to Kafka: exactly-once from the
 // database's perspective, at-least-once from the consumer's.

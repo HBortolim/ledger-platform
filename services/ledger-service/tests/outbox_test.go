@@ -16,9 +16,9 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/ledger-platform/ledger-service/internal/metrics"
-	"github.com/ledger-platform/ledger-service/internal/outbox"
-	"github.com/ledger-platform/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/outbox"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
 )
 
 // TestOutboxWorker_PublishesToKafka posts a real transaction (giving a

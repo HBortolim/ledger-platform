@@ -18,7 +18,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/ledger-platform/ledger-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
 )
 
 var systemFundingAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000001")

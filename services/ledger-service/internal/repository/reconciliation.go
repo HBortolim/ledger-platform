@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/shopspring/decimal"
 )
 

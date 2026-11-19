@@ -14,14 +14,14 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ledger-platform/ledger-service/internal/config"
-	"github.com/ledger-platform/ledger-service/internal/handler"
-	"github.com/ledger-platform/ledger-service/internal/logging"
-	"github.com/ledger-platform/ledger-service/internal/observability"
-	"github.com/ledger-platform/ledger-service/internal/outbox"
-	"github.com/ledger-platform/ledger-service/internal/reconciliation"
-	"github.com/ledger-platform/ledger-service/internal/repository"
-	"github.com/ledger-platform/ledger-service/internal/service"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/handler"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/logging"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/observability"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/outbox"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/reconciliation"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/service"
 )
 
 func main() {

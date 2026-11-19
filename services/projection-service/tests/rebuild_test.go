@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/config"
-	"github.com/ledger-platform/projection-service/internal/consumer"
-	"github.com/ledger-platform/projection-service/internal/repository"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/config"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/consumer"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/repository"
 )
 
 // insertLedgerEntry writes one ledger_db.ledger_entries row as the owner role -- the way the

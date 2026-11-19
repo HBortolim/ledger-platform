@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/ledger-platform/projection-service/internal/domain"
 )
 
 type RebuildHandler struct {

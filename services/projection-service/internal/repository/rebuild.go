@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
-	"github.com/ledger-platform/projection-service/internal/domain"
-	"github.com/ledger-platform/projection-service/internal/sequence"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/sequence"
 )
 
 type RebuildRepository struct {

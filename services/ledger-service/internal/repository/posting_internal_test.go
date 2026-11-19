@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/HBortolim/ledger-platform/services/ledger-service/internal/domain"
 	"github.com/google/uuid"
-	"github.com/ledger-platform/ledger-service/internal/domain"
 	"github.com/shopspring/decimal"
 )
 

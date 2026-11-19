@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ledger-platform/projection-service/internal/domain"
-	"github.com/ledger-platform/projection-service/internal/metrics"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/domain"
+	"github.com/HBortolim/ledger-platform/services/projection-service/internal/metrics"
 )
 
 type RebuildRepository interface {
