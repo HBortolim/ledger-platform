@@ -21,9 +21,15 @@ jobs:
         run: ./mvnw -q verify
       - name: Check for SQL string concatenation
         working-directory: services/wallet-service
+        # Lines that concatenate a string literal AND mention SQL/query words. (The previous
+        # form, `grep ... || true | grep ...`, parsed as `grep || (true | grep ...)`: when the
+        # first grep matched, COUNT held the matching lines instead of a number, `[ -gt ]`
+        # errored, and the `if` silently fell through -- the step could never fail.)
         run: |
-          COUNT=$(grep -rn --include="*.java" '".*\+.*"' src/main || true | grep -i 'query\|sql' | wc -l)
-          if [ "$COUNT" -gt 0 ]; then echo "Possible SQL concatenation"; exit 1; fi
+          COUNT=$( (grep -rnE --include="*.java" '"[^"]*"[[:space:]]*\+|\+[[:space:]]*"[^"]*"' src/main || true) \
+            | grep -ciE 'select|insert|update|delete|query|sql' || true)
+          if [ "$COUNT" -gt 0 ]; then echo "Possible SQL concatenation ($COUNT lines):"; \
+            grep -rnE --include="*.java" '"[^"]*"[[:space:]]*\+|\+[[:space:]]*"[^"]*"' src/main | grep -iE 'select|insert|update|delete|query|sql'; exit 1; fi
 
   ledger-service:
     name: Ledger Service (Go)
@@ -32,11 +38,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version-file: services/ledger-service/go.mod
           cache-dependency-path: services/ledger-service/go.sum
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.6.2
           working-directory: services/ledger-service
       - name: Test
         working-directory: services/ledger-service
@@ -49,12 +56,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version-file: services/projection-service/go.mod
           cache-dependency-path: services/projection-service/go.sum
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.6.2
           working-directory: services/projection-service
       - name: Test
         working-directory: services/projection-service
         run: go test ./...
+
+  e2e-vet:
+    name: E2E suite compiles (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tests/e2e/go.mod
+          cache-dependency-path: tests/e2e/go.sum
+      # The suite itself needs the compose stack and stays out of CI; this only catches a broken build.
+      - name: Vet
+        working-directory: tests/e2e
+        run: go vet -tags=e2e ./...
